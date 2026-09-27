@@ -466,8 +466,14 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 
 .composer-actions { display: flex; gap: 8px; flex-wrap: wrap; flex: 1 1 200px; }
 .composer-actions .btn { flex: 1 1 140px; }
-.composer-row-mode { margin-top: 8px; }
-.composer-row-mode .seg { flex: 1 1 100%; max-width: 420px; }
+.composer-row-mode { margin-top: 8px; align-items: center; gap: 10px; flex-wrap: wrap; }
+.composer-row-mode .seg { flex: 1 1 auto; max-width: 420px; }
+.use-horde-btn {
+  flex: 0 0 auto;
+  border-color: var(--accent, #c45b8c);
+  color: var(--accent, #c45b8c);
+  font-weight: 600;
+}
 .gen-advanced-fields .field select {
   width: 100%; min-height: 42px; border-radius: 10px;
   border: 1px solid var(--line-2); background: var(--bg); color: var(--text);

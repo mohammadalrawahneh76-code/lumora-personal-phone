@@ -743,9 +743,65 @@
   const NSFW_LOCK = "Adult fictional 21+ characters only. Explicit NSFW allowed.";
   const HORDE_ANON_KEY = "0000000000";
   const HORDE_API = "https://stablehorde.net/api/v2";
+  const IMAGE_PROMPT_MAX = 1400;
+  const IMAGE_MASTER_SNIPPET = 400;
+  const POLLINATIONS_URL_SAFE = 1800;
 
   function buildFullPrompt(c, scene) {
     return (c.masterAppearance || "") + "\n\nScene:\n" + scene;
+  }
+
+  /** Short identity for image APIs (Pollinations URL length / Horde). Copy/preview still use buildFullPrompt. */
+  function buildImagePrompt(c, scene, mode) {
+    const a = (c && c.attrs) || {};
+    let age = parseInt(c && c.age, 10);
+    if (isNaN(age) || age < 22) age = 22;
+    const identity = [];
+    identity.push((c && c.name ? c.name : "Character") + ", adult age " + age + "+.");
+    if (a.gender) identity.push("Gender: " + a.gender + ".");
+    if (a.ethnicity && a.ethnicity !== "Any") identity.push("Look: " + a.ethnicity + ".");
+    if (a.hair) identity.push("Hair: " + a.hair + ".");
+    if (a.eyes) identity.push("Eyes: " + a.eyes + ".");
+    if (a.body) identity.push("Body: " + a.body + ".");
+    if (a.style) identity.push("Style: " + a.style + ".");
+    if (a.details) identity.push("Details: " + String(a.details).slice(0, 120) + ".");
+    const compact = identity.slice(0, 8).join("\n");
+
+    let masterBit = String((c && c.masterAppearance) || "").trim();
+    if (masterBit.length > IMAGE_MASTER_SNIPPET) {
+      masterBit = masterBit.slice(0, IMAGE_MASTER_SNIPPET).replace(/\s+\S*$/, "") + "…";
+    }
+
+    const sceneText = String(scene || "").trim();
+    let prompt =
+      "Identity lock (keep consistent):\n" +
+      compact +
+      (masterBit ? "\n\n" + masterBit : "") +
+      "\n\nScene:\n" +
+      sceneText;
+
+    const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
+    if (m === "nsfw") prompt = NSFW_LOCK + "\n\n" + prompt;
+
+    if (prompt.length > IMAGE_PROMPT_MAX) {
+      // Keep identity + scene; drop master snippet first, then trim scene tail
+      prompt =
+        (m === "nsfw" ? NSFW_LOCK + "\n\n" : "") +
+        "Identity lock (keep consistent):\n" +
+        compact +
+        "\n\nScene:\n" +
+        sceneText;
+      if (prompt.length > IMAGE_PROMPT_MAX) {
+        const head =
+          (m === "nsfw" ? NSFW_LOCK + "\n\n" : "") +
+          "Identity lock (keep consistent):\n" +
+          compact +
+          "\n\nScene:\n";
+        const room = Math.max(80, IMAGE_PROMPT_MAX - head.length - 1);
+        prompt = head + sceneText.slice(0, room) + "…";
+      }
+    }
+    return prompt;
   }
 
   function getGenMode() {
@@ -758,6 +814,7 @@
     const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
     save(KEYS.genMode, m);
     $$("#modeSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === m));
+    syncProviderForMode(m);
     return m;
   }
 
@@ -770,9 +827,47 @@
     return v === "horde" ? "horde" : "pollinations";
   }
 
+  function setGenProvider(provider) {
+    const p = provider === "horde" ? "horde" : "pollinations";
+    const el = $("#genProvider");
+    if (el) el.value = p;
+    save(KEYS.genProvider, p);
+    syncHordeKeyVisibility();
+    syncUseHordeBtn();
+    return p;
+  }
+
+  function syncUseHordeBtn() {
+    const btn = $("#useHordeBtn");
+    if (!btn) return;
+    const mode = getGenMode();
+    const onHorde = getGenProvider() === "horde";
+    btn.hidden = !(mode === "nsfw" && !onHorde);
+  }
+
+  function syncProviderForMode(mode) {
+    if (mode === "nsfw") {
+      // Prefer AI Horde for NSFW (Pollinations often filters / URL limits)
+      setGenProvider("horde");
+    } else {
+      syncUseHordeBtn();
+      syncHordeKeyVisibility();
+    }
+  }
+
   function prepareGenPrompt(full, mode) {
     if (mode === "nsfw") return NSFW_LOCK + "\n\n" + full;
     return full;
+  }
+
+  function resolveGenProvider(mode, imagePrompt) {
+    const selected = getGenProvider();
+    if (selected === "horde") return "horde";
+    if (mode === "nsfw") return "horde";
+    const len = (imagePrompt || "").length;
+    const enc = encodeURIComponent(imagePrompt || "").length;
+    if (len > IMAGE_PROMPT_MAX || enc > POLLINATIONS_URL_SAFE) return "horde";
+    return "pollinations";
   }
 
   function buildPollinationsUrl(prompt, aspect, mode) {
@@ -815,6 +910,24 @@
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  function hordeErrorMessage(status, json, fallback) {
+    const msg = (json && (json.message || json.error || json.errors)) || "";
+    const text = typeof msg === "string" ? msg : JSON.stringify(msg);
+    if (status === 401 || status === 403) {
+      return "AI Horde auth failed — check your API key (or use anonymous 0000000000).";
+    }
+    if (status === 429) {
+      return "AI Horde rate limit — wait a minute, or paste a free key from stablehorde.net.";
+    }
+    if (status >= 500) {
+      return "AI Horde is temporarily unavailable (" + status + "). Try again shortly.";
+    }
+    if (/kudos|rate|limit|slow|maintenance/i.test(text)) {
+      return text || fallback;
+    }
+    return text || fallback || ("AI Horde error (" + status + ")");
+  }
+
   async function generateWithHorde(prompt, aspect, mode) {
     const { width, height } = aspectSize(aspect);
     const seedEl = $("#genSeed");
@@ -845,48 +958,88 @@
       apikey,
       "Client-Agent": "LumoraPersonal:1.0:github.com/lumora",
     };
-    const submit = await fetch(HORDE_API + "/generate/async", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
+    let submit;
+    try {
+      submit = await fetch(HORDE_API + "/generate/async", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+    } catch (netErr) {
+      throw new Error("Could not reach AI Horde — check your connection and try again.");
+    }
     const submitJson = await submit.json().catch(() => ({}));
     if (!submit.ok) {
-      const msg =
-        (submitJson && (submitJson.message || submitJson.error)) ||
-        "AI Horde rejected the request (" + submit.status + ")";
-      throw new Error(msg);
+      throw new Error(
+        hordeErrorMessage(
+          submit.status,
+          submitJson,
+          "AI Horde rejected the request (" + submit.status + ")"
+        )
+      );
     }
     const id = submitJson.id;
     if (!id) throw new Error("AI Horde did not return a job id");
-    const deadline = Date.now() + 180000;
+    const deadline = Date.now() + 300000; // 5 min — NSFW/anonymous queues can be slow
     let done = false;
+    let lastCheck = {};
     while (Date.now() < deadline) {
-      await sleep(2500);
-      const checkRes = await fetch(HORDE_API + "/generate/check/" + encodeURIComponent(id), {
-        headers: { apikey, "Client-Agent": headers["Client-Agent"] },
-      });
-      const check = await checkRes.json().catch(() => ({}));
-      if (!checkRes.ok) {
-        throw new Error((check && check.message) || "AI Horde check failed");
+      await sleep(3000);
+      let checkRes;
+      try {
+        checkRes = await fetch(HORDE_API + "/generate/check/" + encodeURIComponent(id), {
+          headers: { apikey, "Client-Agent": headers["Client-Agent"] },
+        });
+      } catch (_) {
+        continue;
       }
-      if (check.faulted) throw new Error("AI Horde job faulted — try again");
+      const check = await checkRes.json().catch(() => ({}));
+      lastCheck = check;
+      if (!checkRes.ok) {
+        throw new Error(
+          hordeErrorMessage(checkRes.status, check, "AI Horde check failed")
+        );
+      }
+      if (check.faulted) {
+        throw new Error(
+          (check.message && String(check.message)) ||
+            "AI Horde job faulted — try again or change model/size."
+        );
+      }
+      if (check.is_possible === false) {
+        throw new Error(
+          "No AI Horde workers available for this request — try again later or clear the model override."
+        );
+      }
       if (check.done) {
         done = true;
         break;
       }
     }
-    if (!done) throw new Error("AI Horde timed out waiting for a worker");
+    if (!done) {
+      const q = lastCheck && lastCheck.queue_position;
+      const waitHint =
+        typeof q === "number"
+          ? " (still queue #" + q + ")"
+          : lastCheck && lastCheck.waiting
+            ? " (waiting for a worker)"
+            : "";
+      throw new Error(
+        "AI Horde timed out" + waitHint + " — try again, or use a free key from stablehorde.net for priority."
+      );
+    }
     const statusRes = await fetch(HORDE_API + "/generate/status/" + encodeURIComponent(id), {
       headers: { apikey, "Client-Agent": headers["Client-Agent"] },
     });
     const status = await statusRes.json().catch(() => ({}));
     if (!statusRes.ok) {
-      throw new Error((status && status.message) || "AI Horde status failed");
+      throw new Error(
+        hordeErrorMessage(statusRes.status, status, "AI Horde status failed")
+      );
     }
     const gens = (status && status.generations) || [];
     const img = gens[0] && gens[0].img;
-    if (!img) throw new Error("AI Horde returned no image");
+    if (!img) throw new Error("AI Horde returned no image — workers may have been busy.");
     if (/^https?:\/\//i.test(img)) return img;
     if (img.startsWith("data:")) return img;
     return "data:image/webp;base64," + img;
@@ -919,37 +1072,147 @@
     img.removeAttribute("src");
     img.onload = null;
     img.onerror = null;
+    try {
+      img.referrerPolicy = "no-referrer";
+    } catch (_) {}
     return { wrap, img, frame };
   }
 
-  function showGenPreview(url) {
-    const parts = prepareGenPreviewFrame();
-    if (!parts) return;
-    const { img, frame } = parts;
+  async function tryFetchImageAsBlobUrl(url) {
+    const res = await fetch(url, {
+      mode: "cors",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    if (!blob || !String(blob.type || "").startsWith("image/")) {
+      throw new Error("Not an image");
+    }
+    const objUrl = URL.createObjectURL(blob);
+    state.objectUrls.push(objUrl);
+    return objUrl;
+  }
+
+  function softenGenFailToast(extra) {
+    toast(
+      extra ||
+        "Couldn't load the image. Try AI Horde, soften the scene, or generate again."
+    );
+  }
+
+  async function runHordeAndShow(imagePrompt, aspect, mode) {
+    prepareGenPreviewFrame();
     setGenLoading(true);
-    const timeout = setTimeout(() => {
-      if (state.genLoading) {
-        setGenLoading(false);
-        state.lastGenUrl = null;
-        toast("Image generation timed out. Try again in a moment.");
-      }
-    }, 90000);
-    img.onload = () => {
-      clearTimeout(timeout);
-      setGenLoading(false);
-      if (frame) frame.style.aspectRatio = "";
-      img.hidden = false;
-      state.lastGenUrl = url;
-      toast("Image ready");
-    };
-    img.onerror = () => {
-      clearTimeout(timeout);
+    try {
+      const url = await generateWithHorde(imagePrompt, aspect, mode);
+      await showGenPreview(url, { allowHordeFallback: false });
+    } catch (err) {
       setGenLoading(false);
       state.lastGenUrl = null;
-      img.hidden = true;
-      toast("Image failed to load. The free API may be busy or filtered this prompt — try AI Horde for NSFW, or soften the scene.");
-    };
-    img.src = url;
+      toast((err && err.message) || "AI Horde generation failed");
+    }
+  }
+
+  function showGenPreview(url, opts) {
+    opts = opts || {};
+    const parts = prepareGenPreviewFrame();
+    if (!parts) return Promise.resolve();
+    const { img, frame } = parts;
+    setGenLoading(true);
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+
+      const timeout = setTimeout(() => {
+        if (state.genLoading) {
+          setGenLoading(false);
+          state.lastGenUrl = null;
+          toast("Image generation timed out. Try AI Horde or try again.");
+        }
+        finish();
+      }, opts.timeoutMs || 120000);
+
+      const succeed = (finalUrl) => {
+        clearTimeout(timeout);
+        setGenLoading(false);
+        if (frame) frame.style.aspectRatio = "";
+        img.hidden = false;
+        state.lastGenUrl = finalUrl;
+        toast("Image ready");
+        finish();
+      };
+
+      const failToHordeOrToast = async () => {
+        clearTimeout(timeout);
+        if (
+          opts.allowHordeFallback &&
+          opts.imagePrompt &&
+          !opts._triedHorde
+        ) {
+          opts._triedHorde = true;
+          toast("Retrying with AI Horde…");
+          try {
+            const hordeUrl = await generateWithHorde(
+              opts.imagePrompt,
+              opts.aspect,
+              opts.mode
+            );
+            setGenProvider("horde");
+            await showGenPreview(hordeUrl, {
+              allowHordeFallback: false,
+              timeoutMs: 90000,
+            });
+            finish();
+            return;
+          } catch (err) {
+            setGenLoading(false);
+            state.lastGenUrl = null;
+            img.hidden = true;
+            toast(
+              (err && err.message) ||
+                "Couldn't load the image. Try AI Horde or soften the scene."
+            );
+            finish();
+            return;
+          }
+        }
+        setGenLoading(false);
+        state.lastGenUrl = null;
+        img.hidden = true;
+        softenGenFailToast();
+        finish();
+      };
+
+      img.onload = () => succeed(img.src || url);
+      img.onerror = async () => {
+        if (!opts._triedFetch) {
+          opts._triedFetch = true;
+          try {
+            const blobUrl = await tryFetchImageAsBlobUrl(url);
+            img.onerror = async () => {
+              await failToHordeOrToast();
+            };
+            img.src = blobUrl;
+            return;
+          } catch (_) {
+            await failToHordeOrToast();
+            return;
+          }
+        }
+        await failToHordeOrToast();
+      };
+
+      try {
+        img.referrerPolicy = "no-referrer";
+      } catch (_) {}
+      img.src = url;
+    });
   }
 
   async function generateSceneImage() {
@@ -964,30 +1227,42 @@
     }
     const aspect = ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "3:4";
     const mode = getGenMode();
-    const provider = getGenProvider();
-    const full = prepareGenPrompt(buildFullPrompt(c, scene), mode);
+    const imagePrompt = buildImagePrompt(c, scene, mode);
     updateFullPreview();
+
+    let provider = resolveGenProvider(mode, imagePrompt);
+    if (provider === "horde" && getGenProvider() !== "horde") {
+      setGenProvider("horde");
+    }
+
     if (provider === "horde") {
-      prepareGenPreviewFrame();
-      setGenLoading(true);
-      try {
-        const url = await generateWithHorde(full, aspect, mode);
-        showGenPreview(url);
-      } catch (err) {
-        setGenLoading(false);
-        state.lastGenUrl = null;
-        toast((err && err.message) || "AI Horde generation failed");
-      }
+      await runHordeAndShow(imagePrompt, aspect, mode);
       return;
     }
-    const url = buildPollinationsUrl(full, aspect, mode);
-    showGenPreview(url);
+
+    const url = buildPollinationsUrl(imagePrompt, aspect, mode);
+    // Extra guard: Safari often fails on very long GET URLs
+    if (url.length > 2200) {
+      toast("Prompt still long for Pollinations — using AI Horde…");
+      setGenProvider("horde");
+      await runHordeAndShow(imagePrompt, aspect, mode);
+      return;
+    }
+
+    await showGenPreview(url, {
+      allowHordeFallback: true,
+      imagePrompt,
+      aspect,
+      mode,
+      timeoutMs: 90000,
+    });
   }
 
   function syncHordeKeyVisibility() {
     const field = $("#genHordeKeyField");
     if (!field) return;
     field.hidden = getGenProvider() !== "horde";
+    syncUseHordeBtn();
   }
 
   // ——— Media ———
@@ -1364,10 +1639,23 @@
     const providerEl = $("#genProvider");
     if (providerEl) {
       const storedProvider = load(KEYS.genProvider, "pollinations");
-      providerEl.value = storedProvider === "horde" ? "horde" : "pollinations";
+      const initialMode = load(KEYS.genMode, "soft");
+      // NSFW defaults to Horde; otherwise restore saved provider
+      if (initialMode === "nsfw") {
+        providerEl.value = "horde";
+      } else {
+        providerEl.value = storedProvider === "horde" ? "horde" : "pollinations";
+      }
       providerEl.addEventListener("change", () => {
         save(KEYS.genProvider, getGenProvider());
         syncHordeKeyVisibility();
+      });
+    }
+    const useHordeBtn = $("#useHordeBtn");
+    if (useHordeBtn) {
+      useHordeBtn.addEventListener("click", () => {
+        setGenProvider("horde");
+        toast("Using AI Horde for generation");
       });
     }
     const hordeKeyEl = $("#genHordeKey");
