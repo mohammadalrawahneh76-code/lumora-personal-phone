@@ -89,8 +89,8 @@
       <h2 class="h2">Three steps, all local</h2>
       <ol class="steps">
         <li><span class="num">01</span><h3>Design the character</h3><p>Pick niche, look chips, and a master appearance string. Or start with Lila Bloom.</p></li>
-        <li><span class="num">02</span><h3>Build prompts &amp; captions</h3><p>Scene library with soft / suggestive / NSFW moods. Copy master + scene into any image tool you use.</p></li>
-        <li><span class="num">03</span><h3>Plan &amp; track</h3><p>Calendar ideas, daily checklist, and a media notes library for generations you make elsewhere.</p></li>
+        <li><span class="num">02</span><h3>Build prompts &amp; captions</h3><p>Scene library with soft / suggestive / NSFW moods. Generate a preview via a free public image API, or copy master + scene into any other tool.</p></li>
+        <li><span class="num">03</span><h3>Plan &amp; track</h3><p>Calendar ideas, daily checklist, and a media library for in-app generations plus notes from elsewhere.</p></li>
       </ol>
       <div class="personal-banner">
         <strong>Personal use only.</strong> No sign-in, no billing, no credits, no backend. Export a JSON backup anytime — clearing browser data for this file’s origin erases local studio data.
@@ -298,7 +298,7 @@
       <div class="ws-panel" id="panel-generate" role="tabpanel">
         <div class="panel-head">
           <h2 class="h3">Generate scene</h2>
-          <p class="hint">Build a full prompt (master + scene) to copy into your image tool. Optionally save a note or local image reference.</p>
+          <p class="hint">Build a full prompt (master + scene), generate a preview with a free public image API, or copy into any other tool. Save results to your media library.</p>
         </div>
         <div class="composer" id="composer">
           <div class="chips scroll-x" id="presets"></div>
@@ -309,13 +309,54 @@
               <button type="button" data-v="1:1">Square</button>
               <button type="button" data-v="9:16">Story</button>
             </div>
-            <button class="btn btn-light" id="copyFullPromptBtn">Copy full prompt</button>
+            <div class="composer-actions">
+              <button type="button" class="btn btn-light" id="generateImageBtn">Generate image</button>
+              <button type="button" class="btn btn-ghost" id="copyFullPromptBtn">Copy full prompt</button>
+            </div>
           </div>
+          <div class="composer-row composer-row-mode">
+            <div class="seg" id="modeSeg" role="radiogroup" aria-label="Content mode">
+              <button type="button" class="on" data-v="soft">Soft</button>
+              <button type="button" data-v="suggestive">Suggestive</button>
+              <button type="button" data-v="nsfw">NSFW</button>
+            </div>
+          </div>
+          <p class="gen-api-note">Soft / Suggestive / NSFW modes. Free Pollinations often still filters explicit NSFW; for reliable NSFW pick AI Horde and optionally paste a free key from stablehorde.net. Adult fictional 21+ only. Results stay in this browser.</p>
+          <details class="gen-advanced">
+            <summary>Advanced (optional)</summary>
+            <div class="gen-advanced-fields">
+              <label class="field">
+                <span class="label">Provider</span>
+                <select id="genProvider">
+                  <option value="pollinations">Pollinations (free)</option>
+                  <option value="horde">AI Horde (better NSFW)</option>
+                </select>
+              </label>
+              <label class="field" id="genHordeKeyField">
+                <span class="label">AI Horde API key <em>optional · anonymous 0000000000 has rate limits</em></span>
+                <input type="text" id="genHordeKey" maxlength="64" placeholder="0000000000 or paste key from stablehorde.net" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span class="label">Seed <em>blank = random</em></span>
+                <input type="text" id="genSeed" inputmode="numeric" maxlength="16" placeholder="e.g. 42" />
+              </label>
+              <label class="field">
+                <span class="label">Model <em>Pollinations query param / Horde override</em></span>
+                <input type="text" id="genModel" maxlength="40" placeholder="e.g. flux" />
+              </label>
+            </div>
+          </details>
           <div class="prompt-preview" id="fullPromptPreview" hidden></div>
+          <div class="gen-preview" id="genPreview" hidden>
+            <div class="gen-preview-frame" id="genPreviewFrame">
+              <div class="gen-preview-skeleton" id="genPreviewSkeleton" hidden>Generating…</div>
+              <img id="genPreviewImg" alt="Generated scene" hidden />
+            </div>
+          </div>
           <div class="media-note-form">
             <label class="field">
               <span class="label">Save as generation note <em>optional</em></span>
-              <input type="text" id="genNoteLabel" maxlength="120" placeholder="Label, e.g. Golden hour window — Midjourney v6" />
+              <input type="text" id="genNoteLabel" maxlength="120" placeholder="Label, e.g. Golden hour window" />
             </label>
             <label class="field">
               <span class="label">Notes / seed / what worked</span>
@@ -403,7 +444,7 @@
       <div class="ws-panel" id="panel-media" role="tabpanel">
         <div class="panel-head">
           <h2 class="h3">Media library</h2>
-          <p class="hint">Offline notes / labels for generations you made elsewhere. Local image previews use object URLs (re-attach after refresh if needed — notes persist).</p>
+          <p class="hint">In-app generations (image URL), local uploads, and notes. Remote previews load from the free API URL; local uploads stay in this browser.</p>
         </div>
         <div class="toolbar">
           <button type="button" class="btn btn-light btn-sm" id="btn-add-media-note">+ Add note</button>

@@ -9,6 +9,9 @@
   const KEYS = {
     characters: PREFIX + "characters",
     migrated: PREFIX + "migrated_v1",
+    genMode: PREFIX + "gen_mode",
+    hordeKey: PREFIX + "horde_key",
+    genProvider: PREFIX + "gen_provider",
   };
 
   const $ = (s, el = document) => el.querySelector(s);
@@ -23,6 +26,8 @@
     viewing: null,
     editingPromptId: null,
     objectUrls: [], // revoke on navigate
+    lastGenUrl: null,
+    genLoading: false,
   };
 
   // ——— Starter: Lila Bloom ———
@@ -718,6 +723,273 @@
     $("#checklist-progress").textContent = doneCount + " / " + CHECKLIST_ITEMS.length + " done";
   }
 
+  // ——— Image generation (Pollinations, browser-only) ———
+  function aspectSize(aspect) {
+    switch (aspect) {
+      case "1:1":
+        return { width: 1024, height: 1024 };
+      case "9:16":
+        return { width: 768, height: 1344 };
+      case "3:4":
+      default:
+        return { width: 768, height: 1024 };
+    }
+  }
+
+  function mediaSrc(m) {
+    return (m && (m.imageDataUrl || m.imageUrl)) || "";
+  }
+
+  const NSFW_LOCK = "Adult fictional 21+ characters only. Explicit NSFW allowed.";
+  const HORDE_ANON_KEY = "0000000000";
+  const HORDE_API = "https://stablehorde.net/api/v2";
+
+  function buildFullPrompt(c, scene) {
+    return (c.masterAppearance || "") + "\n\nScene:\n" + scene;
+  }
+
+  function getGenMode() {
+    const btn = $("#modeSeg .on");
+    const v = (btn && btn.dataset.v) || load(KEYS.genMode, "soft") || "soft";
+    return v === "suggestive" || v === "nsfw" ? v : "soft";
+  }
+
+  function setGenMode(mode) {
+    const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
+    save(KEYS.genMode, m);
+    $$("#modeSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === m));
+    return m;
+  }
+
+  function getGenProvider() {
+    const el = $("#genProvider");
+    if (el && (el.value === "horde" || el.value === "pollinations")) {
+      return el.value;
+    }
+    const v = load(KEYS.genProvider, "pollinations") || "pollinations";
+    return v === "horde" ? "horde" : "pollinations";
+  }
+
+  function prepareGenPrompt(full, mode) {
+    if (mode === "nsfw") return NSFW_LOCK + "\n\n" + full;
+    return full;
+  }
+
+  function buildPollinationsUrl(prompt, aspect, mode) {
+    const { width, height } = aspectSize(aspect);
+    const m = mode || getGenMode();
+    const params = new URLSearchParams({
+      width: String(width),
+      height: String(height),
+      nologo: "true",
+      enhance: "true",
+    });
+    if (m === "soft") params.set("safe", "true");
+    else params.set("safe", "false");
+    if (m === "nsfw") params.set("private", "true");
+    const seedEl = $("#genSeed");
+    const modelEl = $("#genModel");
+    const seed = seedEl ? seedEl.value.trim() : "";
+    let model = modelEl ? modelEl.value.trim() : "";
+    if (!model && m === "nsfw") model = "flux";
+    if (seed) params.set("seed", seed);
+    else params.set("seed", String(Math.floor(Math.random() * 1e9)));
+    if (model) params.set("model", model);
+    return (
+      "https://image.pollinations.ai/prompt/" +
+      encodeURIComponent(prompt) +
+      "?" +
+      params.toString()
+    );
+  }
+
+  function getHordeKey() {
+    const el = $("#genHordeKey");
+    const fromInput = el ? el.value.trim() : "";
+    if (fromInput) return fromInput;
+    const stored = load(KEYS.hordeKey, "");
+    return stored || HORDE_ANON_KEY;
+  }
+
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  async function generateWithHorde(prompt, aspect, mode) {
+    const { width, height } = aspectSize(aspect);
+    const seedEl = $("#genSeed");
+    const modelEl = $("#genModel");
+    const seedRaw = seedEl ? seedEl.value.trim() : "";
+    const model = modelEl ? modelEl.value.trim() : "";
+    const allowNsfw = mode === "suggestive" || mode === "nsfw";
+    const params = {
+      width,
+      height,
+      n: 1,
+      steps: 25,
+      cfg_scale: 7,
+    };
+    if (seedRaw && /^\d+$/.test(seedRaw)) params.seed = seedRaw;
+    const body = {
+      prompt,
+      nsfw: allowNsfw,
+      censor_nsfw: !allowNsfw,
+      r2: true,
+      shared: false,
+      params,
+    };
+    if (model) body.models = [model];
+    const apikey = getHordeKey();
+    const headers = {
+      "Content-Type": "application/json",
+      apikey,
+      "Client-Agent": "LumoraPersonal:1.0:github.com/lumora",
+    };
+    const submit = await fetch(HORDE_API + "/generate/async", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const submitJson = await submit.json().catch(() => ({}));
+    if (!submit.ok) {
+      const msg =
+        (submitJson && (submitJson.message || submitJson.error)) ||
+        "AI Horde rejected the request (" + submit.status + ")";
+      throw new Error(msg);
+    }
+    const id = submitJson.id;
+    if (!id) throw new Error("AI Horde did not return a job id");
+    const deadline = Date.now() + 180000;
+    let done = false;
+    while (Date.now() < deadline) {
+      await sleep(2500);
+      const checkRes = await fetch(HORDE_API + "/generate/check/" + encodeURIComponent(id), {
+        headers: { apikey, "Client-Agent": headers["Client-Agent"] },
+      });
+      const check = await checkRes.json().catch(() => ({}));
+      if (!checkRes.ok) {
+        throw new Error((check && check.message) || "AI Horde check failed");
+      }
+      if (check.faulted) throw new Error("AI Horde job faulted — try again");
+      if (check.done) {
+        done = true;
+        break;
+      }
+    }
+    if (!done) throw new Error("AI Horde timed out waiting for a worker");
+    const statusRes = await fetch(HORDE_API + "/generate/status/" + encodeURIComponent(id), {
+      headers: { apikey, "Client-Agent": headers["Client-Agent"] },
+    });
+    const status = await statusRes.json().catch(() => ({}));
+    if (!statusRes.ok) {
+      throw new Error((status && status.message) || "AI Horde status failed");
+    }
+    const gens = (status && status.generations) || [];
+    const img = gens[0] && gens[0].img;
+    if (!img) throw new Error("AI Horde returned no image");
+    if (/^https?:\/\//i.test(img)) return img;
+    if (img.startsWith("data:")) return img;
+    return "data:image/webp;base64," + img;
+  }
+
+  function setGenLoading(on) {
+    state.genLoading = !!on;
+    const btn = $("#generateImageBtn");
+    if (!btn) return;
+    btn.disabled = !!on;
+    btn.classList.toggle("is-loading", !!on);
+    btn.textContent = on ? "Generating…" : "Generate image";
+    const sk = $("#genPreviewSkeleton");
+    if (sk) sk.hidden = !on;
+  }
+
+  function prepareGenPreviewFrame() {
+    const wrap = $("#genPreview");
+    const img = $("#genPreviewImg");
+    const frame = $("#genPreviewFrame");
+    if (!wrap || !img) return null;
+    wrap.hidden = false;
+    const aspectBtn = $("#aspectSeg .on");
+    const aspect = (aspectBtn && aspectBtn.dataset.v) || "3:4";
+    const ratioCss = aspect.replace(":", "/");
+    if (frame) frame.style.aspectRatio = ratioCss;
+    const sk = $("#genPreviewSkeleton");
+    if (sk) sk.style.aspectRatio = ratioCss;
+    img.hidden = true;
+    img.removeAttribute("src");
+    img.onload = null;
+    img.onerror = null;
+    return { wrap, img, frame };
+  }
+
+  function showGenPreview(url) {
+    const parts = prepareGenPreviewFrame();
+    if (!parts) return;
+    const { img, frame } = parts;
+    setGenLoading(true);
+    const timeout = setTimeout(() => {
+      if (state.genLoading) {
+        setGenLoading(false);
+        state.lastGenUrl = null;
+        toast("Image generation timed out. Try again in a moment.");
+      }
+    }, 90000);
+    img.onload = () => {
+      clearTimeout(timeout);
+      setGenLoading(false);
+      if (frame) frame.style.aspectRatio = "";
+      img.hidden = false;
+      state.lastGenUrl = url;
+      toast("Image ready");
+    };
+    img.onerror = () => {
+      clearTimeout(timeout);
+      setGenLoading(false);
+      state.lastGenUrl = null;
+      img.hidden = true;
+      toast("Image failed to load. The free API may be busy or filtered this prompt — try AI Horde for NSFW, or soften the scene.");
+    };
+    img.src = url;
+  }
+
+  async function generateSceneImage() {
+    const c = current();
+    if (!c) return;
+    if (state.genLoading) return;
+    const scene = $("#sceneInput").value.trim();
+    if (!scene) {
+      toast("Describe a scene first");
+      $("#sceneInput").focus();
+      return;
+    }
+    const aspect = ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "3:4";
+    const mode = getGenMode();
+    const provider = getGenProvider();
+    const full = prepareGenPrompt(buildFullPrompt(c, scene), mode);
+    updateFullPreview();
+    if (provider === "horde") {
+      prepareGenPreviewFrame();
+      setGenLoading(true);
+      try {
+        const url = await generateWithHorde(full, aspect, mode);
+        showGenPreview(url);
+      } catch (err) {
+        setGenLoading(false);
+        state.lastGenUrl = null;
+        toast((err && err.message) || "AI Horde generation failed");
+      }
+      return;
+    }
+    const url = buildPollinationsUrl(full, aspect, mode);
+    showGenPreview(url);
+  }
+
+  function syncHordeKeyVisibility() {
+    const field = $("#genHordeKeyField");
+    if (!field) return;
+    field.hidden = getGenProvider() !== "horde";
+  }
+
   // ——— Media ———
   function renderMedia() {
     const c = current();
@@ -731,14 +1003,17 @@
     grid.innerHTML = media
       .map((m) => {
         const ratio = (m.aspect || "3:4").replace(":", "/");
-        if (m.imageDataUrl) {
+        const src = mediaSrc(m);
+        if (src) {
           return (
             '<button class="tile" data-open="' +
             esc(m.id) +
             '" style="aspect-ratio:' +
             ratio +
-            '"><span class="tag">Note</span><img src="' +
-            m.imageDataUrl +
+            '"><span class="tag">' +
+            (m.imageUrl ? "Gen" : "Note") +
+            '</span><img src="' +
+            esc(src) +
             '" alt="' +
             esc(m.label) +
             '" loading="lazy"/></button>'
@@ -765,8 +1040,9 @@
     const m = (c.media || []).find((x) => x.id === id);
     if (!m) return;
     state.viewing = m;
-    if (m.imageDataUrl) {
-      $("#viewerMedia").innerHTML = '<img src="' + m.imageDataUrl + '" alt="' + esc(m.label) + '"/>';
+    const src = mediaSrc(m);
+    if (src) {
+      $("#viewerMedia").innerHTML = '<img src="' + esc(src) + '" alt="' + esc(m.label) + '"/>';
     } else {
       $("#viewerMedia").innerHTML =
         '<div class="media-tile-note" style="min-height:200px;aspect-ratio:auto"><b>' + esc(m.label) + "</b></div>";
@@ -812,7 +1088,7 @@
     box.hidden = false;
     box.innerHTML =
       "<strong>Full prompt preview</strong>" +
-      esc((c.masterAppearance || "") + "\n\nScene:\n" + scene);
+      esc(buildFullPrompt(c, scene));
   }
 
   // ——— Export / Import ———
@@ -1041,7 +1317,7 @@
       const prompt = prompts.find((p) => p.id === id);
       if (!prompt) return;
       if (btn.dataset.act === "copy") {
-        const full = (c.masterAppearance || "") + "\n\nScene:\n" + prompt.scene;
+        const full = buildFullPrompt(c, prompt.scene);
         const ok = await copyText(full);
         toast(ok ? "Full prompt copied (master + scene)" : "Copy failed");
       } else if (btn.dataset.act === "use") {
@@ -1080,6 +1356,34 @@
       $$("#aspectSeg button").forEach((x) => x.classList.remove("on"));
       b.classList.add("on");
     });
+    $("#modeSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      setGenMode(b.dataset.v);
+    });
+    const providerEl = $("#genProvider");
+    if (providerEl) {
+      const storedProvider = load(KEYS.genProvider, "pollinations");
+      providerEl.value = storedProvider === "horde" ? "horde" : "pollinations";
+      providerEl.addEventListener("change", () => {
+        save(KEYS.genProvider, getGenProvider());
+        syncHordeKeyVisibility();
+      });
+    }
+    const hordeKeyEl = $("#genHordeKey");
+    if (hordeKeyEl) {
+      const storedKey = load(KEYS.hordeKey, "");
+      if (storedKey) hordeKeyEl.value = storedKey;
+      hordeKeyEl.addEventListener("change", () => {
+        save(KEYS.hordeKey, hordeKeyEl.value.trim());
+      });
+      hordeKeyEl.addEventListener("blur", () => {
+        save(KEYS.hordeKey, hordeKeyEl.value.trim());
+      });
+    }
+    setGenMode(load(KEYS.genMode, "soft"));
+    syncHordeKeyVisibility();
+    $("#generateImageBtn").addEventListener("click", () => generateSceneImage());
     $("#copyFullPromptBtn").addEventListener("click", async () => {
       const c = current();
       if (!c) return;
@@ -1089,7 +1393,7 @@
         $("#sceneInput").focus();
         return;
       }
-      const full = (c.masterAppearance || "") + "\n\nScene:\n" + scene;
+      const full = prepareGenPrompt(buildFullPrompt(c, scene), getGenMode());
       const ok = await copyText(full);
       toast(ok ? "Full prompt copied" : "Copy failed");
     });
@@ -1106,6 +1410,11 @@
         toast(err.message);
         return;
       }
+      const imageUrl = !imageDataUrl && state.lastGenUrl ? state.lastGenUrl : null;
+      if (!imageDataUrl && !imageUrl && !notes && !$("#genNoteLabel").value.trim()) {
+        toast("Generate an image, attach a file, or add a label/notes first");
+        return;
+      }
       const media = [
         {
           id: uid("m"),
@@ -1113,6 +1422,7 @@
           notes,
           aspect,
           imageDataUrl,
+          imageUrl,
           createdAt: new Date().toISOString(),
         },
         ...(c.media || []),
