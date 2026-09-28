@@ -2972,6 +2972,7 @@
     renderQuickSets();
     renderPromptPills();
     ensureAgentSkills();
+    wireAgent();
 
     // routing
     window.addEventListener("hashchange", route);
