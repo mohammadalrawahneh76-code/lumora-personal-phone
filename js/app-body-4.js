@@ -382,7 +382,9 @@ function boot() {
     if (storedProvider === "grok") {
       storedProvider = "horde";
     }
-    if (storedProvider === "pollinations" && initialMode !== "nsfw") {
+    if (storedProvider === "flux") {
+      providerEl.value = "flux";
+    } else if (storedProvider === "pollinations" && initialMode !== "nsfw") {
       providerEl.value = "pollinations";
     } else {
       providerEl.value = "horde";
@@ -392,6 +394,20 @@ function boot() {
       setGenProvider(providerEl.value);
     });
   }
+  const fluxSeg = $("#genFluxModelSeg");
+  if (fluxSeg && !fluxSeg.dataset.bound) {
+    fluxSeg.dataset.bound = "1";
+    if (typeof setFluxModel === "function") {
+      setFluxModel(load(KEYS.fluxModel, "schnell") || "schnell");
+    }
+    fluxSeg.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b || !b.dataset.v) return;
+      if (typeof setFluxModel === "function") setFluxModel(b.dataset.v);
+      toast("Flux model: " + (b.dataset.v === "kontext" ? "Kontext" : "Schnell"));
+    });
+  }
+  if (typeof syncFluxModelVisibility === "function") syncFluxModelVisibility();
   const useHordeBtn = $("#useHordeBtn");
   if (useHordeBtn) {
     useHordeBtn.addEventListener("click", () => {

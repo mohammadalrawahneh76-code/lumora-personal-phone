@@ -12,6 +12,7 @@ export const KEYS = {
   featherlessKey: PREFIX + "featherless_key",
   openrouterKey: PREFIX + "openrouter_key",
   genProvider: PREFIX + "gen_provider",
+  fluxModel: PREFIX + "flux_model",
   agentSkills: PREFIX + "agent_skills",
   hordeSoftSkillsV1: PREFIX + "horde_soft_skills_v1",
   groqSkillsV1: PREFIX + "groq_skills_v1",

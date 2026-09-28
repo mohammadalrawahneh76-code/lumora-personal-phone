@@ -963,6 +963,14 @@ const HORDE_ANON_KEY = "0000000000";
 const HORDE_API = "https://stablehorde.net/api/v2";
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
 const NVIDIA_API = "https://integrate.api.nvidia.com/v1/chat/completions";
+/** NVIDIA Flux image endpoints (same nvapi key as NIM chat). */
+const NVIDIA_FLUX_SCHNELL = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell";
+const NVIDIA_FLUX_KONTEXT = "https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-kontext-dev";
+const FLUX_MODELS = [
+  { id: "schnell", label: "Schnell", url: NVIDIA_FLUX_SCHNELL, steps: 4, cfg: 0, needsImage: false, blurb: "Fast text→image" },
+  { id: "kontext", label: "Kontext", url: NVIDIA_FLUX_KONTEXT, steps: 30, cfg: 3.5, needsImage: true, blurb: "Edit prior image (needs last gen)" },
+];
+const FLUX_MODEL_DEFAULT = "schnell";
 /** NVIDIA NIM chat models for Agent (same API key). */
 const NVIDIA_MODELS = [
   {
@@ -1132,7 +1140,7 @@ function setGenMode(mode) {
 
 function getGenProvider() {
   const el = $("#genProvider");
-  if (el && (el.value === "horde" || el.value === "pollinations")) {
+  if (el && (el.value === "horde" || el.value === "pollinations" || el.value === "flux")) {
     return el.value;
   }
   let v = load(KEYS.genProvider, "horde") || "horde";
@@ -1141,17 +1149,20 @@ function getGenProvider() {
     v = "horde";
     save(KEYS.genProvider, v);
   }
+  if (v === "flux") return "flux";
   if (v === "pollinations") return "pollinations";
   return "horde";
 }
 
 function setGenProvider(provider) {
-  const p = provider === "horde" ? "horde" : "pollinations";
+  const p =
+    provider === "flux" ? "flux" : provider === "horde" ? "horde" : "pollinations";
   const el = $("#genProvider");
   if (el) el.value = p;
   save(KEYS.genProvider, p);
   syncHordeKeyVisibility();
   syncUseHordeBtn();
+  syncFluxModelVisibility();
   return p;
 }
 
@@ -1165,6 +1176,13 @@ function syncUseHordeBtn() {
 
 function syncProviderForMode(mode) {
   const selected = getGenProvider();
+  // Keep explicit Flux (NVIDIA) across Soft/Suggestive/NSFW
+  if (selected === "flux") {
+    syncUseHordeBtn();
+    syncHordeKeyVisibility();
+    syncFluxModelVisibility();
+    return;
+  }
   // NSFW forces Horde (Pollinations often filters)
   if (mode === "nsfw") {
     setGenProvider("horde");
@@ -1177,6 +1195,7 @@ function syncProviderForMode(mode) {
   }
   syncUseHordeBtn();
   syncHordeKeyVisibility();
+  syncFluxModelVisibility();
 }
 
 function prepareGenPrompt(full, mode) {
@@ -1186,6 +1205,11 @@ function prepareGenPrompt(full, mode) {
 
 function resolveGenProvider(mode, imagePrompt) {
   const selected = getGenProvider();
+  // NVIDIA Flux when selected + NIM key present (same nvapi- key as Agent chat)
+  if (selected === "flux") {
+    if (typeof getNvidiaKey === "function" && getNvidiaKey()) return "flux";
+    return "horde";
+  }
   // Explicit Pollinations: honor for Soft/Suggestive; NSFW still forces Horde
   if (selected === "pollinations") {
     if (mode === "nsfw") return "horde";
@@ -1255,6 +1279,174 @@ function getNvidiaKey() {
   const fromInput = el ? el.value.trim() : "";
   if (fromInput) return fromInput;
   return load(KEYS.nvidiaKey, "") || "";
+}
+
+function getFluxModelId() {
+  const el = $("#genFluxModelSeg");
+  if (el) {
+    const on = el.querySelector("button.on");
+    if (on && on.dataset.v) return on.dataset.v;
+  }
+  const stored = load(KEYS.fluxModel, FLUX_MODEL_DEFAULT) || FLUX_MODEL_DEFAULT;
+  return FLUX_MODELS.some((m) => m.id === stored) ? stored : FLUX_MODEL_DEFAULT;
+}
+
+function getFluxModelMeta() {
+  const id = getFluxModelId();
+  return (
+    FLUX_MODELS.find((m) => m.id === id) ||
+    FLUX_MODELS.find((m) => m.id === FLUX_MODEL_DEFAULT)
+  );
+}
+
+function setFluxModel(id) {
+  const meta = FLUX_MODELS.find((m) => m.id === id);
+  const use = meta ? meta.id : FLUX_MODEL_DEFAULT;
+  save(KEYS.fluxModel, use);
+  const seg = $("#genFluxModelSeg");
+  if (seg) {
+    $$("button", seg).forEach((b) => b.classList.toggle("on", b.dataset.v === use));
+  }
+  return use;
+}
+
+function syncFluxModelVisibility() {
+  const field = $("#genFluxModelField");
+  if (!field) return;
+  field.hidden = getGenProvider() !== "flux";
+}
+
+/** Snap to sizes NVIDIA Flux Schnell cloud API accepts. */
+function fluxAspectSize(aspect) {
+  switch (aspect) {
+    case "1:1":
+      return { width: 1024, height: 1024 };
+    case "9:16":
+      return { width: 768, height: 1344 };
+    case "3:4":
+    default:
+      return { width: 768, height: 1024 };
+  }
+}
+
+function extractFluxB64(data) {
+  if (!data) return "";
+  if (typeof data === "string") {
+    const s = data.trim();
+    if (s.startsWith("data:image")) return s;
+    if (/^[A-Za-z0-9+/=\s]+$/.test(s) && s.length > 64) return s.replace(/\s+/g, "");
+  }
+  const art = data.artifacts && data.artifacts[0];
+  if (art) {
+    if (art.base64) return art.base64;
+    if (art.b64_json) return art.b64_json;
+    if (art.image) return art.image;
+  }
+  const d0 = data.data && data.data[0];
+  if (d0) {
+    if (d0.b64_json) return d0.b64_json;
+    if (d0.base64) return d0.base64;
+    if (d0.url) return d0.url;
+  }
+  if (data.image) return data.image;
+  if (data.b64_json) return data.b64_json;
+  if (data.base64) return data.base64;
+  return "";
+}
+
+function fluxB64ToDataUrl(raw) {
+  let s = String(raw || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("data:image")) return s;
+  s = s.replace(/^data:image\/[^;]+;base64,/, "");
+  return "data:image/jpeg;base64," + s;
+}
+
+/**
+ * NVIDIA Flux image gen (Schnell text→image; Kontext edit when prior image available).
+ * Returns a data: or https URL. Throws on failure (caller falls back to Horde/Pollinations).
+ */
+async function generateWithNvidiaFlux(prompt, aspect, mode, opts) {
+  opts = opts || {};
+  const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
+  const key = typeof getNvidiaKey === "function" ? getNvidiaKey() : "";
+  if (!key) {
+    throw new Error("Add an NVIDIA NIM key in Agent → Engines (build.nvidia.com) for Flux.");
+  }
+  let meta = getFluxModelMeta();
+  let imageB64 = opts.image || "";
+  // Kontext requires an input image — fall back to Schnell for pure text→image
+  if (meta && meta.needsImage && !imageB64) {
+    const last = (state && state.lastGenUrl) || "";
+    if (typeof last === "string" && last.startsWith("data:image")) {
+      imageB64 = last;
+    } else {
+      if (onStatus) onStatus("Flux Kontext needs a prior image — using Schnell…");
+      meta = FLUX_MODELS.find((m) => m.id === "schnell") || meta;
+    }
+  }
+  const { width, height } = fluxAspectSize(aspect);
+  const seedEl = $("#genSeed");
+  const seedRaw = seedEl ? seedEl.value.trim() : "";
+  let seed = parseInt(seedRaw, 10);
+  if (isNaN(seed) || seed < 0) seed = Math.floor(Math.random() * 1e9);
+  const payload = {
+    prompt: String(prompt || "").slice(0, 10000),
+    width,
+    height,
+    cfg_scale: meta.cfg,
+    samples: 1,
+    seed,
+    steps: meta.steps,
+  };
+  if (meta.id === "schnell") {
+    payload.mode = "base";
+  }
+  if (meta.needsImage && imageB64) {
+    payload.image = imageB64.startsWith("data:")
+      ? imageB64
+      : "data:image/png;base64," + imageB64;
+    payload.aspect_ratio = "match_input_image";
+  }
+  if (onStatus) onStatus("Flux " + meta.label + " · generating…");
+  let res;
+  try {
+    res = await fetch(meta.url, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      headers: {
+        Authorization: "Bearer " + key,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    throw new Error(
+      (err && err.message) ||
+        "Could not reach NVIDIA Flux (CORS or network) — falling back."
+    );
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (data && (data.message || data.detail || data.title || data.error)) || "";
+    const textMsg = typeof msg === "string" ? msg : JSON.stringify(msg);
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Invalid NVIDIA NIM key — check Agent → Engines.");
+    }
+    if (res.status === 429) {
+      throw new Error("NVIDIA Flux rate limit — wait a moment and try again.");
+    }
+    throw new Error(textMsg || "NVIDIA Flux error (" + res.status + ")");
+  }
+  const raw = extractFluxB64(data);
+  const url = fluxB64ToDataUrl(raw);
+  if (!url) throw new Error("NVIDIA Flux returned no image data");
+  if (onStatus) onStatus("Flux " + meta.label + " · ready");
+  return url;
 }
 
 function getOpenRouterKey() {
@@ -1979,6 +2171,26 @@ async function runStoryboardSet() {
 }
 
 
+async function runFluxAndShow(imagePrompt, aspect, mode) {
+  prepareGenPreviewFrame();
+  setGenLoading(true);
+  try {
+    const url = await generateWithNvidiaFlux(imagePrompt, aspect, mode, {
+      onStatus: (t) => {
+        if (typeof setHordeQueueStatus === "function") setHordeQueueStatus(t);
+      },
+    });
+    await showGenPreview(url, { allowHordeFallback: false, timeoutMs: 90000 });
+  } catch (err) {
+    toast(
+      "Flux failed (" +
+        ((err && err.message) || "error") +
+        ") — trying Horde…"
+    );
+    await runHordeAndShow(imagePrompt, aspect, mode);
+  }
+}
+
 async function generateSceneImage() {
   const c = current();
   if (!c) return;
@@ -1996,8 +2208,16 @@ async function generateSceneImage() {
   updateFullPreview();
 
   let provider = resolveGenProvider(mode, imagePrompt);
-  if (provider === "horde" && getGenProvider() !== "horde") {
+  if (getGenProvider() === "flux" && provider !== "flux") {
+    toast("Flux needs an NVIDIA NIM key in Agent → Engines — using Horde…");
+  }
+  if (provider === "horde" && getGenProvider() !== "horde" && getGenProvider() !== "flux") {
     setGenProvider("horde");
+  }
+
+  if (provider === "flux") {
+    await runFluxAndShow(imagePrompt, aspect, mode);
+    return;
   }
 
   if (provider === "horde") {
@@ -2028,6 +2248,7 @@ function syncHordeKeyVisibility() {
   // Always visible under Advanced so Soft users see the free key path
   if (hordeField) hordeField.hidden = false;
   syncUseHordeBtn();
+  syncFluxModelVisibility();
 }
 
 // ——— Media ———

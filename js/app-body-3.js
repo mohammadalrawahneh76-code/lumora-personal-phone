@@ -521,11 +521,50 @@ const AgentEngines = {
         return { ok: false, error: "Describe the scene first", prompt: "", mode, scene };
       }
       const imagePrompt = buildImagePrompt(c, scene, mode);
-      if (onStatus) onStatus("Image Engine · queuing AI Horde (free, 1–3 min)…");
 
       let hordeErr = null;
       let pollErr = null;
       let used = "horde";
+
+      // Prefer NVIDIA Flux when Generate provider is Flux + NIM key present
+      const wantFlux =
+        typeof getGenProvider === "function" &&
+        getGenProvider() === "flux" &&
+        typeof getNvidiaKey === "function" &&
+        !!getNvidiaKey() &&
+        typeof generateWithNvidiaFlux === "function";
+      if (wantFlux) {
+        try {
+          if (onStatus) onStatus("Image Engine · NVIDIA Flux…");
+          const rawFlux = await generateWithNvidiaFlux(imagePrompt, aspect, mode, {
+            onStatus: (t) => {
+              if (onStatus) onStatus("Image Engine · " + t);
+            },
+          });
+          if (onStatus) onStatus("Image Engine · verifying Flux image…");
+          const confirmed = await confirmAgentImage(rawFlux);
+          return {
+            ok: true,
+            imageUrl: confirmed.chatUrl,
+            chatUrl: confirmed.chatUrl,
+            mediaUrl: confirmed.mediaUrl,
+            provider: "flux",
+            prompt: imagePrompt,
+            mode,
+            scene,
+          };
+        } catch (fluxErr) {
+          if (onStatus) {
+            onStatus(
+              "Image Engine · Flux failed — trying Horde (" +
+                ((fluxErr && fluxErr.message) || "error") +
+                ")…"
+            );
+          }
+        }
+      }
+
+      if (onStatus) onStatus("Image Engine · queuing AI Horde (free, 1–3 min)…");
 
       try {
         const rawHorde = await generateWithHorde(imagePrompt, aspect, mode, {
@@ -720,7 +759,7 @@ function renderAgentEnginesPanel() {
       const badge = ready ? "ready" : "stub";
       const packLabel = (typeof getStylePack === "function" && getStylePack().label) || "Photoreal";
       const detail = ready
-        ? "Free AI Horde first (Soft/Suggestive/NSFW) · Pollinations fallback · face-lock · style " +
+        ? "Flux (if selected+key) → Horde → Pollinations · face-lock · style " +
           packLabel
         : "Free stub — no Seedance/APOB-quality video without keys/payment yet";
       return (
