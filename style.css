@@ -990,3 +990,97 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
   margin-left: -4px;
 }
 .hero-upload-label { display: inline-flex; align-items: center; cursor: pointer; }
+
+
+/* Steal List W5–6 */
+.dress-ref-box, .duo-cast-box {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+}
+.dress-ref-thumb-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.dress-ref-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: #111;
+}
+.director-pills { margin-top: 6px; }
+.director-pill { border-color: rgba(200, 160, 220, 0.35); }
+.horde-queue-meter {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 180, 188, 0.35);
+  background: rgba(232, 180, 188, 0.08);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f0c8d0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.horde-queue-meter.busy::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e8b4bc;
+  box-shadow: 0 0 0 3px rgba(232, 180, 188, 0.25);
+  animation: hordePulse 1.2s ease-in-out infinite;
+}
+@keyframes hordePulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+.movie-pack-panel { margin-top: 10px; }
+.movie-pack-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+.movie-pack-beats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.movie-pack-beats li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+}
+.movie-pack-beats li.done {
+  opacity: 0.72;
+  border-color: rgba(232, 180, 188, 0.4);
+}
+.movie-beat-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  font-size: 0.85rem;
+}
+.agent-dress-ref { margin-top: 10px; }
