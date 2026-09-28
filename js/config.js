@@ -33,3 +33,16 @@ export const KEYS = {
   bluesmindsImageModelV3: PREFIX + "bluesminds_image_model_v3",
 };
 
+/** Public browser DSN (safe in frontend). Org: lumora-i0 / project: lumora-personal-phone */
+export const SENTRY_DSN =
+  "https://466326c5da046fdc672078432ca11a3f@o4512166492176384.ingest.us.sentry.io/4512166515179520";
+export const APP_VERSION = "20260929a";
+
+/**
+ * PostHog: not wired — no PostHog MCP/server authenticated in this environment.
+ * To add later: create a PostHog project, put the public project API key here
+ * (e.g. export const POSTHOG_KEY = "phc_…"), load posthog-js via CDN in index.html,
+ * init with autocapture:false / capture_pageview:true only. Never commit personal API secrets.
+ */
+export const POSTHOG_KEY = ""; // placeholder — see note above
+

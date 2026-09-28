@@ -220,6 +220,15 @@ function buildMasterFromAttrs(name, age, attrs, niche) {
   return lines.filter(Boolean).join("\n");
 }
 
+
+function reportError(err, tags) {
+  try {
+    if (!window.Sentry || !err) return;
+    const e = err instanceof Error ? err : new Error(String(err));
+    window.Sentry.captureException(e, tags ? { tags: tags } : undefined);
+  } catch (_) {}
+}
+
 // ——— Toast / copy ———
 let toastT;
 function toast(msg) {
@@ -2368,6 +2377,7 @@ async function runBluesmindsAndShow(imagePrompt, aspect, mode) {
     setGenLoading(false);
     state.lastGenUrl = null;
     if (typeof clearHordeQueueStatus === "function") clearHordeQueueStatus();
+    reportError(err, { area: "generate" });
     toast((err && err.message) || "Image generation failed");
   }
 }
@@ -2650,6 +2660,7 @@ async function runStoryboardSet() {
       renderStoryboardGrid(results);
     } catch (err) {
       failCount++;
+      reportError(err, { area: "storyboard" });
       results.push({
         label: v.label,
         url: null,

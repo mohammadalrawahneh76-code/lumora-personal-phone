@@ -1091,6 +1091,7 @@ async function applyAgenticEdit(instruction, opts) {
     return { ok: true, chatUrl, mediaUrl, provider: result.provider };
   } catch (err) {
     const msg = (err && err.message) || "Agentic edit failed";
+    if (typeof reportError === "function") reportError(err, { area: "agentic-edit" });
     toast(msg);
     if (fromAgent) {
       const next = getAgentChat(chatMode);
@@ -1196,6 +1197,7 @@ async function animateLastStill(motionPrompt, opts) {
     return { ok: true, pending: true };
   } catch (err) {
     const msg = (err && err.message) || "Animate failed";
+    if (typeof reportError === "function") reportError(err, { area: "animate" });
     toast(msg);
     if (fromAgent) {
       const next = getAgentChat(chatMode);

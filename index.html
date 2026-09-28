@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="./style.css?v=20260928r" />
+<link rel="stylesheet" href="./style.css?v=20260929a" />
 </head>
 <body>
 <button class="skip" onclick="document.getElementById('main').focus()">Skip to content</button>
@@ -800,6 +800,15 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js?v=20260928r"></script>
+<script>
+  window.__LUMORA_SENTRY_DSN__ = "https://466326c5da046fdc672078432ca11a3f@o4512166492176384.ingest.us.sentry.io/4512166515179520";
+  window.__LUMORA_RELEASE__ = "20260929a";
+</script>
+<script
+  src="https://browser.sentry-cdn.com/8.55.0/bundle.min.js"
+  crossorigin="anonymous"
+></script>
+<script src="./js/sentry-init.js?v=20260929a"></script>
+<script type="module" src="./js/app.js?v=20260929a"></script>
 </body>
 </html>
