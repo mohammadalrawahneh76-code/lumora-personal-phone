@@ -319,8 +319,25 @@ button.credits { cursor: pointer; }
 }
 .personal-banner strong { color: var(--text); }
 
+/* Workspace IA: primary groups + secondary tabs */
+.ws-groups {
+  display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 0;
+  padding: 4px; background: var(--surface-2); border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.ws-group {
+  flex: 1 1 auto; min-width: 64px; min-height: 40px; padding: 0 12px;
+  border-radius: 9px; font-size: 0.8rem; font-weight: 600;
+  letter-spacing: 0.02em; text-transform: uppercase;
+  color: var(--muted); transition: color 0.2s, background 0.2s;
+}
+.ws-group:hover { color: var(--text); }
+.ws-group.on {
+  color: var(--bg); background: var(--accent);
+}
+
 .ws-tabs {
-  display: flex; gap: 4px; overflow-x: auto; margin: 8px 0 20px;
+  display: flex; gap: 4px; overflow-x: auto; margin: 6px 0 20px;
   padding-bottom: 4px; scrollbar-width: none; border-bottom: 1px solid var(--line);
 }
 .ws-tabs::-webkit-scrollbar { display: none; }
@@ -1217,4 +1234,16 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
     min-height: 44px;
   }
   .btn-sm { min-height: 44px; }
+}
+
+
+/* Mobile topbar declutter — backup actions stay in the drawer */
+@media (max-width: 640px) {
+  .topbar .personal-note,
+  .topbar #btnExport,
+  .topbar #btnImport {
+    display: none !important;
+  }
+  .topbar-right { gap: 6px; }
+  .topbar-right .btn-sm { padding-inline: 10px; }
 }
