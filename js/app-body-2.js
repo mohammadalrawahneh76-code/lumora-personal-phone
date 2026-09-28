@@ -419,7 +419,8 @@ async function callNvidiaChat(messages) {
   }
   let res;
   try {
-    res = await fetch(NVIDIA_API, {
+    const fetchFn = typeof nvidiaFetch === "function" ? nvidiaFetch : fetch;
+    res = await fetchFn(NVIDIA_API, {
       method: "POST",
       mode: "cors",
       credentials: "omit",
@@ -431,9 +432,12 @@ async function callNvidiaChat(messages) {
       body: JSON.stringify(payload),
     });
   } catch (err) {
+    const hasProxy = typeof getNvidiaProxyBase === "function" && !!getNvidiaProxyBase();
     throw new Error(
       friendlyTextApiError(err, "NVIDIA NIM") ||
-        "Could not reach NVIDIA NIM (CORS or network) — Agent will try Groq/Pollinations."
+        (hasProxy
+          ? "Could not reach NVIDIA NIM via proxy — Agent will try Groq/Pollinations."
+          : "Could not reach NVIDIA NIM (browser CORS; set CORS proxy in Engines) — Agent will try Groq/Pollinations.")
     );
   }
   const data = await res.json().catch(() => ({}));

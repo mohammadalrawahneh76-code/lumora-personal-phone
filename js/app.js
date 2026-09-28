@@ -32,7 +32,7 @@ import { WIZARD_GROUPS, PERSONALITY_VIBE_TEXT } from "./data/wizard.js";
 
 const __lumoraParts = await Promise.all(
   [1, 2, 3, 4].map((n) =>
-    fetch(new URL(`./app-body-${n}.js?v=20260928g`, import.meta.url)).then((r) => {
+    fetch(new URL(`./app-body-${n}.js?v=20260928h`, import.meta.url)).then((r) => {
       if (!r.ok) throw new Error(`Failed to load app-body-${n}.js (${r.status})`);
       return r.text();
     })

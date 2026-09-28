@@ -430,7 +430,7 @@
             </div>
             <button type="button" class="btn btn-ghost btn-sm use-horde-btn" id="useHordeBtn" hidden>Switch to AI Horde</button>
           </div>
-          <p class="gen-api-note" id="genProviderNote">Flux selected needs NVIDIA key in Agent → Engines. Horde/Pollinations stay free fallbacks.</p>
+          <p class="gen-api-note" id="genProviderNote">AI Horde (free) — reliable in browser.</p>
           <div class="seg gen-provider-seg" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
             <button type="button" id="btnProviderFlux" data-provider="flux" data-v="flux">Flux</button>
             <button type="button" id="btnProviderHorde" class="on" data-provider="horde" data-v="horde">Horde</button>
@@ -440,7 +440,7 @@
             <button type="button" data-v="schnell" class="on">Schnell</button>
             <button type="button" data-v="kontext">Kontext</button>
           </div>
-          <p class="hint" id="genFluxHint" hidden>Schnell = new image · Kontext = edit last image · NVIDIA key in Agent → Engines</p>
+          <p class="hint" id="genFluxHint" hidden>Schnell = new image · Kontext = edit last image · needs NVIDIA key + CORS proxy in Agent → Engines (else Horde fallback)</p>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
@@ -766,6 +766,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js?v=20260928g"></script>
+<script type="module" src="./js/app.js?v=20260928h"></script>
 </body>
 </html>

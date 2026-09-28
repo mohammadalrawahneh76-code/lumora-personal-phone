@@ -9,6 +9,7 @@ export const KEYS = {
   groqKey: PREFIX + "groq_key",
   nvidiaKey: PREFIX + "nvidia_key",
   nvidiaModel: PREFIX + "nvidia_model",
+  nvidiaProxy: PREFIX + "nvidia_proxy",
   featherlessKey: PREFIX + "featherless_key",
   openrouterKey: PREFIX + "openrouter_key",
   genProvider: PREFIX + "gen_provider",

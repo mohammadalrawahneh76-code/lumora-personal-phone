@@ -759,7 +759,7 @@ function renderAgentEnginesPanel() {
       const badge = ready ? "ready" : "stub";
       const packLabel = (typeof getStylePack === "function" && getStylePack().label) || "Photoreal";
       const detail = ready
-        ? "Flux (if selected+key) → Horde → Pollinations · face-lock · style " +
+        ? "Flux (key+CORS proxy) best-effort → Horde (reliable) → Pollinations · face-lock · style " +
           packLabel
         : "Free stub — no Seedance/APOB-quality video without keys/payment yet";
       return (
@@ -816,13 +816,21 @@ function renderAgentEnginesPanel() {
       );
     }).join("") +
     "</div>";
+  const hasNvidiaProxy =
+    typeof getNvidiaProxyBase === "function" && !!getNvidiaProxyBase();
   const engineDetail = nvIsLexi
     ? nvidiaReady
-      ? "Dolphin (Venice Uncensored) ready via OpenRouter — preferred for Suggestive / NSFW Agent Send"
-      : "Dolphin selected — paste an OpenRouter key below (falls back to Groq / Pollinations)"
+      ? "Dolphin (Venice Uncensored) ready via OpenRouter — reliable in browser; preferred for Suggestive / NSFW Agent Send"
+      : "Dolphin selected — paste an OpenRouter key below (reliable browser path; else Groq / Pollinations)"
     : nvidiaReady
-      ? "NVIDIA NIM: ready — " + nvModelLabel + " (" + nvModelId + ") preferred for Agent Send"
-      : "NVIDIA NIM: not set (falls back to Groq / Pollinations)";
+      ? hasNvidiaProxy
+        ? "NVIDIA NIM: ready via CORS proxy — " +
+          nvModelLabel +
+          " (" +
+          nvModelId +
+          ") preferred for Agent Send"
+        : "NVIDIA NIM: key set but browser CORS blocks direct calls — set CORS proxy below to unlock NIM/Flux; else Groq/Pollinations (Dolphin + Horde are the reliable browser path)"
+      : "NVIDIA NIM: not set — browser CORS needs a proxy for NIM/Flux; Dolphin + Horde work without it (else Groq / Pollinations)";
   const engineLink = nvIsLexi
     ? '<a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>'
     : '<a href="https://build.nvidia.com/models" target="_blank" rel="noopener">build.nvidia.com/models</a>';
@@ -843,7 +851,12 @@ function renderAgentEnginesPanel() {
     '<label class="field agent-nvidia-key-field">' +
     '<span class="label">NVIDIA API key <em>NIM · Lightning / Kimi / Ultra</em></span>' +
     '<input type="password" id="agentNvidiaKey" maxlength="300" placeholder="Paste nvapi-… key" autocomplete="off" />' +
-    '<span class="hint">Lightning = fast · Kimi = default · Ultra = deep reasoning. From <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a>. Browser only.</span>' +
+    '<span class="hint">Lightning = fast · Kimi = default · Ultra = deep reasoning. From <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a>. Key stays in this browser.</span>' +
+    "</label>" +
+    '<label class="field agent-nvidia-proxy-field">' +
+    '<span class="label">NVIDIA CORS proxy URL <em>optional · unlocks Flux + NIM</em></span>' +
+    '<input type="url" id="agentNvidiaProxy" maxlength="300" placeholder="https://your-worker.workers.dev" autocomplete="off" />' +
+    '<span class="hint">GitHub Pages cannot call NVIDIA directly (CORS). Deploy <code>proxy/nvidia-worker.js</code> once — see <a href="https://github.com/mohammadalrawahneh76-code/lumora-personal-phone/blob/main/proxy/README.md" target="_blank" rel="noopener">proxy/README.md</a>. Without it, Flux/NIM are best-effort; Horde + Dolphin are the reliable browser path.</span>' +
     "</label>" +
     '<label class="field agent-openrouter-key-field">' +
     '<span class="label">OpenRouter API key <em>Dolphin · uncensored</em></span>' +
@@ -899,6 +912,27 @@ function renderAgentEnginesPanel() {
     };
     nvidiaInput.addEventListener("change", persistNv);
     nvidiaInput.addEventListener("blur", persistNv);
+  }
+  const nvidiaProxyInput = $("#agentNvidiaProxy");
+  if (nvidiaProxyInput) {
+    const storedProxy = load(KEYS.nvidiaProxy, "") || "";
+    if (storedProxy && !nvidiaProxyInput.value) nvidiaProxyInput.value = storedProxy;
+    const persistProxy = () => {
+      const v = nvidiaProxyInput.value.trim().replace(/\/+$/, "");
+      nvidiaProxyInput.value = v;
+      if (v) save(KEYS.nvidiaProxy, v);
+      else {
+        try {
+          localStorage.removeItem(KEYS.nvidiaProxy);
+        } catch (_) {}
+      }
+      if (typeof updateGenProviderNote === "function") {
+        updateGenProviderNote(typeof getGenProvider === "function" ? getGenProvider() : "horde");
+      }
+      renderAgentEnginesPanel();
+    };
+    nvidiaProxyInput.addEventListener("change", persistProxy);
+    nvidiaProxyInput.addEventListener("blur", persistProxy);
   }
   const openrouterInput = $("#agentOpenRouterKey");
   if (openrouterInput) {

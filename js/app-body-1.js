@@ -1167,8 +1167,15 @@ function setGenProvider(provider) {
   syncHordeKeyVisibility();
   syncUseHordeBtn();
   syncFluxModelVisibility();
-  if (p === "flux" && typeof getNvidiaKey === "function" && !getNvidiaKey()) {
-    toast("Flux selected — paste NVIDIA NIM key in Agent → Engines");
+  updateGenProviderNote(p);
+  if (p === "flux") {
+    const hasKey = typeof getNvidiaKey === "function" && !!getNvidiaKey();
+    const hasProxy = !!getNvidiaProxyBase();
+    if (!hasKey) {
+      toast("Flux selected — paste NVIDIA NIM key + CORS proxy in Agent → Engines");
+    } else if (!hasProxy) {
+      toast("Flux needs CORS proxy in Engines (or falls back to Horde)");
+    }
   }
   return p;
 }
@@ -1320,6 +1327,55 @@ function getNvidiaKey() {
   return load(KEYS.nvidiaKey, "") || "";
 }
 
+/** Optional Cloudflare Worker base that CORS-proxies NVIDIA NIM + Flux. */
+function getNvidiaProxyBase() {
+  const el = $("#agentNvidiaProxy");
+  const fromInput = el ? el.value.trim() : "";
+  let v = fromInput || load(KEYS.nvidiaProxy, "") || "";
+  v = String(v).trim().replace(/\/+$/, "");
+  return v;
+}
+
+const NVIDIA_PROXY_HOSTS = new Set([
+  "integrate.api.nvidia.com",
+  "ai.api.nvidia.com",
+]);
+
+/**
+ * fetch() for NVIDIA URLs. When Engines → NVIDIA CORS proxy URL is set,
+ * rewrites to POST {proxyBase}/nvidia?u=<encoded absolute URL>.
+ * Otherwise direct fetch (often blocked by browser CORS on GitHub Pages).
+ */
+function nvidiaFetch(url, init) {
+  const base = getNvidiaProxyBase();
+  let fetchUrl = url;
+  if (base) {
+    try {
+      const u = new URL(url);
+      if (NVIDIA_PROXY_HOSTS.has(u.hostname)) {
+        fetchUrl = base + "/nvidia?u=" + encodeURIComponent(u.toString());
+      }
+    } catch (_) {}
+  }
+  return fetch(fetchUrl, init);
+}
+
+function updateGenProviderNote(provider) {
+  const note = $("#genProviderNote");
+  if (!note) return;
+  const p =
+    provider === "flux" ? "flux" : provider === "pollinations" ? "pollinations" : "horde";
+  if (p === "flux") {
+    note.textContent = getNvidiaProxyBase()
+      ? "Flux via proxy (Schnell/Kontext)."
+      : "Flux needs CORS proxy (Engines) or falls back to Horde.";
+  } else if (p === "horde") {
+    note.textContent = "AI Horde (free) — reliable in browser.";
+  } else {
+    note.textContent = "Pollinations (free Soft/Suggestive). NSFW → prefer Horde.";
+  }
+}
+
 function getFluxModelId() {
   const el = $("#genFluxModelSeg");
   if (el) {
@@ -1452,7 +1508,7 @@ async function generateWithNvidiaFlux(prompt, aspect, mode, opts) {
   if (onStatus) onStatus("Flux " + meta.label + " · generating…");
   let res;
   try {
-    res = await fetch(meta.url, {
+    res = await nvidiaFetch(meta.url, {
       method: "POST",
       mode: "cors",
       credentials: "omit",
@@ -1464,9 +1520,10 @@ async function generateWithNvidiaFlux(prompt, aspect, mode, opts) {
       body: JSON.stringify(payload),
     });
   } catch (err) {
+    const via = getNvidiaProxyBase() ? "proxy" : "direct (no CORS proxy)";
     throw new Error(
       (err && err.message) ||
-        "Could not reach NVIDIA Flux (CORS or network) — falling back."
+        "Could not reach NVIDIA Flux via " + via + " — falling back to Horde."
     );
   }
   const data = await res.json().catch(() => ({}));
