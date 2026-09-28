@@ -322,14 +322,14 @@
             </div>
             <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
           </div>
-          <p class="gen-api-note">Image gen uses a short identity lock; Copy still uses your full master sheet. Soft / Suggestive: Grok Imagine (xAI) for quality, or free Pollinations. NSFW defaults to AI Horde (more reliable for explicit). Keys stay in this browser only. Adult fictional 21+ only.</p>
+          <p class="gen-api-note">Image gen uses a short identity lock; Copy still uses your full master sheet. Pollinations and AI Horde are free. Grok Imagine requires a paid xAI API key/credits — skip it if you don't want to pay. Soft / Suggestive → Pollinations (free); NSFW → AI Horde (free). Keys stay in this browser only. Adult fictional 21+ only.</p>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
               <label class="field">
                 <span class="label">Provider</span>
                 <select id="genProvider">
-                  <option value="grok">Grok Imagine (xAI)</option>
+                  <option value="grok">Grok Imagine (xAI · paid credits)</option>
                   <option value="pollinations">Pollinations (free)</option>
                   <option value="horde">AI Horde (better NSFW)</option>
                 </select>
@@ -337,6 +337,7 @@
               <label class="field" id="genXaiKeyField" hidden>
                 <span class="label">xAI API key <em>from console.x.ai — stored only in this browser</em></span>
                 <input type="password" id="genXaiKey" maxlength="200" placeholder="Paste xAI API key" autocomplete="off" />
+                <span class="hint gen-grok-paid-hint" id="genGrokPaidHint">Paid — needs credits at console.x.ai. Use Pollinations or AI Horde for free.</span>
               </label>
               <label class="field" id="genHordeKeyField" hidden>
                 <span class="label">AI Horde API key <em>optional · anonymous 0000000000 has rate limits</em></span>

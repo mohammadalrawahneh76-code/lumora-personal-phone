@@ -930,6 +930,9 @@
     return "3:4";
   }
 
+  const GROK_PAID_TOAST =
+    "Grok needs a paid xAI key — switch to Pollinations (free) or AI Horde (free NSFW).";
+
   function grokErrorMessage(status, json) {
     const err = json && json.error;
     const msg =
@@ -938,6 +941,12 @@
       "";
     const text = typeof msg === "string" ? msg : JSON.stringify(msg || "");
     const lower = (text + " " + JSON.stringify(json || {})).toLowerCase();
+    if (
+      status === 402 ||
+      /payment|credits?|billing|insufficient.?funds|quota|prepaid|balance/i.test(lower)
+    ) {
+      return GROK_PAID_TOAST;
+    }
     if (status === 401 || status === 403) {
       return "Invalid xAI API key — check the key from console.x.ai.";
     }
@@ -960,9 +969,7 @@
   async function generateWithGrok(prompt, aspect, mode) {
     const key = getXaiKey();
     if (!key) {
-      throw new Error(
-        "Paste your xAI API key from https://console.x.ai (Advanced) to use Grok Imagine."
-      );
+      throw new Error(GROK_PAID_TOAST);
     }
     const modelEl = $("#genModel");
     let model = modelEl ? modelEl.value.trim() : "";
@@ -1199,7 +1206,7 @@
   function softenGenFailToast(extra) {
     toast(
       extra ||
-        "Couldn't load the image. Try Grok Imagine, AI Horde, soften the scene, or generate again."
+        "Couldn't load the image. Try Pollinations (free), AI Horde (free NSFW), soften the scene, or generate again."
     );
   }
 
@@ -1278,7 +1285,7 @@
             img.hidden = true;
             toast(
               (err && err.message) ||
-                "Couldn't load the image. Try Grok Imagine, AI Horde, or soften the scene."
+                "Couldn't load the image. Try Pollinations (free), AI Horde (free NSFW), or soften the scene."
             );
             finish();
             return;
@@ -1338,6 +1345,10 @@
     }
 
     if (provider === "grok") {
+      if (!getXaiKey()) {
+        toast(GROK_PAID_TOAST);
+        return;
+      }
       if (mode === "nsfw" && !state.grokNsfwWarned) {
         state.grokNsfwWarned = true;
         toast("Grok may filter explicit NSFW — AI Horde is more reliable for that.");
@@ -1350,7 +1361,8 @@
       } catch (err) {
         setGenLoading(false);
         state.lastGenUrl = null;
-        toast((err && err.message) || "Grok Imagine generation failed");
+        const msg = (err && err.message) || "Grok Imagine generation failed";
+        toast(msg);
       }
       return;
     }
