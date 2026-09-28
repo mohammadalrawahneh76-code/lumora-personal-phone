@@ -1259,16 +1259,20 @@ function getBluesmindsModel() {
 }
 
 const BLUESMINDS_IMAGE_API = "https://api.bluesminds.com/v1/images/generations";
-/** Official BluesMinds docs example model for POST /v1/images/generations. */
-const BLUESMINDS_IMAGE_MODEL_DEFAULT = "dall-e-3";
-/** Known image-generation ids (ratio_config + docs). Used for toast fallbacks only. */
+/**
+ * Default image model for POST /v1/images/generations.
+ * Live /api/pricing (2026-09-28) lists no image-gen ids; /api/ratio_config still
+ * prices gpt-image-1 + Gemini/Grok image ids. dall-e-3 is absent from both and
+ * returns "No available channel … under group default".
+ */
+const BLUESMINDS_IMAGE_MODEL_DEFAULT = "gpt-image-1";
+/** Image ids present on live ratio_config (skip known-dead dall-e-3). Toast order. */
 const BLUESMINDS_IMAGE_MODEL_FALLBACKS = [
-  "dall-e-3",
   "gpt-image-1",
-  "gemini-2.5-flash-image",
-  "gemini-3.1-flash-image-preview",
-  "gemini-3-pro-image-preview",
   "grok-imagine-image-lite",
+  "gemini-3.1-flash-image-preview",
+  "gemini-2.5-flash-image",
+  "gemini-3-pro-image-preview",
 ];
 
 function getBluesmindsImageModel() {
@@ -1288,8 +1292,8 @@ function bluesmindsImageFallbackSuggestion(failedModel) {
 }
 
 /**
- * Map Lumora aspects to OpenAI Images sizes BluesMinds docs accept
- * (dall-e-3: 1024x1024 | 1024x1792 | 1792x1024).
+ * Map Lumora aspects to OpenAI Images sizes for gpt-image-1
+ * (1024x1024 | 1024x1536 | 1536x1024). Retries drop size if rejected.
  */
 function bluesmindsAspectSize(aspect) {
   switch (aspect) {
@@ -1298,7 +1302,7 @@ function bluesmindsAspectSize(aspect) {
     case "9:16":
     case "3:4":
     default:
-      return "1024x1792";
+      return "1024x1536";
   }
 }
 
@@ -1335,7 +1339,7 @@ function isBluesmindsModelUnavailable(status, msg) {
 
 /**
  * BluesMinds OpenAI-compatible images/generations.
- * Docs: { model, prompt, n, size } — example model dall-e-3, size 1024x1024.
+ * Docs: { model, prompt, n, size } — default gpt-image-1, size 1024x1024.
  * Returns a data: URL or https URL suitable for preview / assertUsableGenImage.
  */
 async function generateWithBluesminds(prompt, aspect, mode, opts) {

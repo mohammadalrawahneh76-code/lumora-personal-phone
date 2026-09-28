@@ -207,7 +207,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "BluesMinds Agent chat",
     description: "BluesMinds key for Agent chat + Generate images",
     body:
-      "Agent chat and Generate images both use BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Chat default gemma-4-26b; image default gemini-2.5-flash-image (overridable). Never suggest Horde, Pollinations, NVIDIA Flux, or paid xAI Grok Imagine as backends.",
+      "Agent chat and Generate images both use BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Chat default gemma-4-26b; image default gpt-image-1 (overridable). Never suggest Horde, Pollinations, NVIDIA Flux, or paid xAI Grok Imagine as backends.",
     enabled: true,
     modes: ["studio", "both"],
   },
