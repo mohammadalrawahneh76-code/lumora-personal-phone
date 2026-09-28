@@ -8,6 +8,7 @@ export const KEYS = {
   xaiKey: PREFIX + "xai_key",
   groqKey: PREFIX + "groq_key",
   nvidiaKey: PREFIX + "nvidia_key",
+  nvidiaModel: PREFIX + "nvidia_model",
   genProvider: PREFIX + "gen_provider",
   agentSkills: PREFIX + "agent_skills",
   hordeSoftSkillsV1: PREFIX + "horde_soft_skills_v1",
@@ -20,4 +21,3 @@ export const KEYS = {
   stealListSkillsV2: PREFIX + "steal_list_skills_v2",
   stealListSkillsV3: PREFIX + "steal_list_skills_v3",
 };
-
