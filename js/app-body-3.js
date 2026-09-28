@@ -60,15 +60,32 @@ function setHordeQueueStatus(text) {
   let label = "";
   if (t) {
     const q = t.match(/queue\s*#?\s*(\d+)/i);
-    if (q) label = "Horde: queue #" + q[1];
-    else if (/verif/i.test(t)) label = "Horde: Verifying…";
-    else if (/generat/i.test(t) && !/queue/i.test(t)) label = "Horde: Generating…";
-    else if (/wait/i.test(t)) label = "Horde: Waiting…";
-    else if (/finish|fetch/i.test(t)) label = "Horde: Fetching…";
-    else if (/pollinations/i.test(t)) label = "Pollinations…";
-    else if (/Image Engine/i.test(t))
-      label = t.replace(/^Image Engine ·\s*/i, "Horde: ").slice(0, 48);
-    else label = ("Horde: " + t).slice(0, 56);
+    // Provider-agnostic status — never show "Horde:" in the UI
+    if (q) label = "Queue #" + q[1];
+    else if (/verif/i.test(t)) label = "Verifying…";
+    else if (/generat/i.test(t) && !/queue/i.test(t)) label = "Generating…";
+    else if (/wait/i.test(t)) label = "Waiting…";
+    else if (/finish|fetch/i.test(t)) label = "Fetching…";
+    else if (/pollinations/i.test(t)) label = "Generating…";
+    else if (/Image Engine/i.test(t)) {
+      label = t
+        .replace(/^Image Engine ·\s*/i, "")
+        .replace(/\bAI Horde\b/gi, "")
+        .replace(/\bHorde\b/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/^[·\s]+|[·\s]+$/g, "")
+        .slice(0, 48);
+      if (!label) label = "Generating…";
+    } else {
+      label = t
+        .replace(/\bAI Horde\b/gi, "")
+        .replace(/\bHorde:\s*/gi, "")
+        .replace(/\bHorde\b/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .trim()
+        .slice(0, 56);
+      if (!label) label = "Generating…";
+    }
   }
   meters.forEach((el) => {
     if (!el) return;
@@ -533,6 +550,12 @@ const AgentEngines = {
         typeof getNvidiaKey === "function" &&
         !!getNvidiaKey() &&
         typeof generateWithNvidiaFlux === "function";
+      // Soft/Suggestive + anon Horde key → Pollinations first (anon often returns black/censored)
+      const preferPollFirst =
+        mode !== "nsfw" &&
+        typeof hasRealHordeKey === "function" &&
+        !hasRealHordeKey();
+
       if (wantFlux) {
         try {
           if (onStatus) onStatus("Image Engine · NVIDIA Flux…");
@@ -541,7 +564,7 @@ const AgentEngines = {
               if (onStatus) onStatus("Image Engine · " + t);
             },
           });
-          if (onStatus) onStatus("Image Engine · verifying Flux image…");
+          if (onStatus) onStatus("Image Engine · verifying image…");
           const confirmed = await confirmAgentImage(rawFlux);
           return {
             ok: true,
@@ -556,7 +579,7 @@ const AgentEngines = {
         } catch (fluxErr) {
           if (onStatus) {
             onStatus(
-              "Image Engine · Flux failed — trying Horde (" +
+              "Image Engine · Flux failed — trying free backend (" +
                 ((fluxErr && fluxErr.message) || "error") +
                 ")…"
             );
@@ -564,15 +587,35 @@ const AgentEngines = {
         }
       }
 
-      if (onStatus) onStatus("Image Engine · queuing AI Horde (free, 1–3 min)…");
+      async function tryPollinations() {
+        used = "pollinations";
+        const pollUrl = buildPollinationsUrl(imagePrompt, aspect, mode);
+        if (pollUrl.length > 2200) {
+          throw new Error("Prompt too long for quick image path");
+        }
+        if (onStatus) onStatus("Image Engine · generating…");
+        const confirmed = await confirmAgentImage(pollUrl);
+        return {
+          ok: true,
+          imageUrl: confirmed.chatUrl,
+          chatUrl: confirmed.chatUrl,
+          mediaUrl: confirmed.mediaUrl,
+          provider: used,
+          prompt: imagePrompt,
+          mode,
+          scene,
+        };
+      }
 
-      try {
+      async function tryHorde() {
+        used = "horde";
+        if (onStatus) onStatus("Image Engine · queuing (free, 1–3 min)…");
         const rawHorde = await generateWithHorde(imagePrompt, aspect, mode, {
           onStatus: (t) => {
             if (onStatus) onStatus("Image Engine · " + t);
           },
         });
-        if (onStatus) onStatus("Image Engine · verifying Horde image…");
+        if (onStatus) onStatus("Image Engine · verifying image…");
         const confirmed = await confirmAgentImage(rawHorde);
         return {
           ok: true,
@@ -584,51 +627,64 @@ const AgentEngines = {
           mode,
           scene,
         };
+      }
+
+      if (preferPollFirst) {
+        try {
+          return await tryPollinations();
+        } catch (err) {
+          pollErr = err;
+          if (onStatus) {
+            onStatus(
+              "Image Engine · quick path failed — trying queue (" +
+                ((err && err.message) || "error") +
+                ")…"
+            );
+          }
+          try {
+            return await tryHorde();
+          } catch (err2) {
+            hordeErr = err2;
+            return {
+              ok: false,
+              error:
+                "Couldn't generate an image (" +
+                ((pollErr && pollErr.message) || "quick path failed") +
+                "; " +
+                ((err2 && err2.message) || "queue failed") +
+                "). Soften the scene or try again.",
+              prompt: imagePrompt,
+              mode,
+              scene,
+              provider: used,
+            };
+          }
+        }
+      }
+
+      try {
+        return await tryHorde();
       } catch (err) {
         hordeErr = err;
       }
 
-      // Soft/Suggestive: Horde first, Pollinations fallback. NSFW stays on Horde.
+      // Soft/Suggestive: queue first, Pollinations fallback. NSFW stays on queue backend.
       if (mode !== "nsfw") {
-        used = "pollinations";
-        if (onStatus) onStatus("Image Engine · Horde failed — trying Pollinations (free)…");
-        const pollUrl = buildPollinationsUrl(imagePrompt, aspect, mode);
-        if (pollUrl.length > 2200) {
-          return {
-            ok: false,
-            error:
-              "Horde failed (" +
-              ((hordeErr && hordeErr.message) || "error") +
-              "); Pollinations URL too long for fallback.",
-            prompt: imagePrompt,
-            mode,
-            scene,
-            provider: used,
-          };
+        if (onStatus) {
+          onStatus("Image Engine · queue failed — trying free fallback…");
         }
         try {
-          if (onStatus) onStatus("Image Engine · verifying Pollinations image…");
-          const confirmed = await confirmAgentImage(pollUrl);
-          return {
-            ok: true,
-            imageUrl: confirmed.chatUrl,
-            chatUrl: confirmed.chatUrl,
-            mediaUrl: confirmed.mediaUrl,
-            provider: used,
-            prompt: imagePrompt,
-            mode,
-            scene,
-          };
+          return await tryPollinations();
         } catch (err2) {
           pollErr = err2;
           return {
             ok: false,
             error:
-              "Horde failed (" +
-              ((hordeErr && hordeErr.message) || "error") +
-              "); Pollinations also failed (" +
+              "Couldn't generate an image (" +
+              ((hordeErr && hordeErr.message) || "queue failed") +
+              "; " +
               ((err2 && err2.message) || "image did not load") +
-              "). Tap Generate image to retry.",
+              "). Soften the scene or try again.",
             prompt: imagePrompt,
             mode,
             scene,

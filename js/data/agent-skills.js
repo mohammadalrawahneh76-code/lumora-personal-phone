@@ -5,7 +5,7 @@ export const STARTER_AGENT_SKILLS = [
     name: "Image quality (free)",
     description: "Prefer Horde for photoreal; Soft/Suggestive first; wait & regenerate",
     body:
-      "Soft/Suggestive/NSFW → AI Horde first (free photoreal). Pollinations is Soft/Suggestive fallback only. Wait 1–3 min for Horde. Regenerate broken anatomy. Free only — never suggest paid xAI Grok or any paid image API. Images = Horde + Pollinations only.",
+      "Soft/Suggestive without a real Horde key → Pollinations first (free). Soft/Suggestive with a Horde key, or NSFW → AI Horde (free photoreal, 1–3 min). Pollinations Soft/Suggestive fallback. Never fake success on blank/black frames. Free only — never suggest paid xAI Grok. Images = Pollinations + Horde only.",
     enabled: true,
     modes: ["studio"],
   },
@@ -192,10 +192,10 @@ export const STEAL_LIST_AGENT_SKILLS = [
   },
   {
     id: "queue-meter",
-    name: "Horde queue meter",
+    name: "Queue meter",
     description: "Live queue/waiting/generating/verifying status",
     body:
-      "Horde queue meter: during generate / storyboard / agentic edit, show live status from generateWithHorde onStatus — queue position, waiting, generating, verifying. Persistent small meter on Generate + Agent (“Horde: queue #3” / “Verifying…”). No fake coin currency. Free only.",
+      "Queue meter: during generate / storyboard / agentic edit, show live status — queue position, waiting, generating, verifying, fetching. Persistent small meter on Generate + Agent (“Queue #3” / “Generating…” / “Verifying…”). Never label the meter “Horde:”. No fake coin currency. Free only.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -207,7 +207,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "BluesMinds Agent chat",
     description: "BluesMinds key for Agent text; images stay Horde/Pollinations",
     body:
-      "Agent text chat uses BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Default model gemma-4-26b unless they change it. Images NEVER use BluesMinds or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine.",
+      "Agent text chat uses BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Default model gemma-4-26b unless they change it. Images NEVER use BluesMinds or paid xAI Grok — Soft/Suggestive without a Horde key = Pollinations first; NSFW / keyed Horde = AI Horde; Pollinations Soft/Suggestive fallback. Never suggest paid xAI Grok Imagine.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -225,7 +225,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Free image routing",
     description: "Decision tree: Horde-first Soft/Suggestive/NSFW / Pollinations fallback",
     body:
-      "Routing decision tree (free-only images): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Agent chat text uses BluesMinds when keyed; that is not an image path.",
+      "Routing decision tree (free-only images): Soft/Suggestive without a real Horde key → Pollinations first (Horde fallback). Soft/Suggestive with a Horde key or NSFW → AI Horde (wait 1–3 min). Never treat blank/black/censored frames as success. Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate. Agent chat text uses BluesMinds when keyed; that is not an image path.",
     enabled: true,
     modes: ["studio", "both"],
   },

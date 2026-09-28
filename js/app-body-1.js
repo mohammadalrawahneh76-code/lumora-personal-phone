@@ -1146,11 +1146,15 @@ function getGenProvider() {
   if (el && (el.value === "horde" || el.value === "pollinations" || el.value === "flux")) {
     return el.value;
   }
-  let v = load(KEYS.genProvider, "horde") || "horde";
+  let v = load(KEYS.genProvider, "") || "";
   // Migrate legacy paid Grok (xAI) image provider → Horde
   if (v === "grok") {
     v = "horde";
     save(KEYS.genProvider, v);
+  }
+  // No stored preference: Soft path prefers Pollinations when anon Horde (often black/censored)
+  if (!v) {
+    v = hasRealHordeKey() ? "horde" : "pollinations";
   }
   if (v === "flux") return "flux";
   if (v === "pollinations") return "pollinations";
@@ -1198,7 +1202,12 @@ function syncProviderForMode(mode) {
     setGenProvider("horde");
     return;
   }
-  // Soft/Suggestive: prefer Horde unless user explicitly picked Pollinations
+  // Soft/Suggestive without a real Horde key → Pollinations (anon Horde often returns black/censored)
+  if (!hasRealHordeKey()) {
+    setGenProvider("pollinations");
+    return;
+  }
+  // Soft/Suggestive with a real Horde key: keep Horde unless user picked Pollinations
   if (selected !== "pollinations") {
     setGenProvider("horde");
     return;
@@ -1218,17 +1227,20 @@ function resolveGenProvider(mode, imagePrompt) {
   // NVIDIA Flux when selected + NIM key present (same nvapi- key as Agent chat)
   if (selected === "flux") {
     if (typeof getNvidiaKey === "function" && getNvidiaKey()) return "flux";
-    return "horde";
+    // no NIM key — fall through to Soft/NSFW defaults below
   }
-  // Explicit Pollinations: honor for Soft/Suggestive; NSFW still forces Horde
-  if (selected === "pollinations") {
-    if (mode === "nsfw") return "horde";
-    const len = (imagePrompt || "").length;
-    const enc = encodeURIComponent(imagePrompt || "").length;
-    if (len > IMAGE_PROMPT_MAX || enc > POLLINATIONS_URL_SAFE) return "horde";
+  // NSFW always Horde (Pollinations filters)
+  if (mode === "nsfw") return "horde";
+
+  const len = (imagePrompt || "").length;
+  const enc = encodeURIComponent(imagePrompt || "").length;
+  const pollOk = len <= IMAGE_PROMPT_MAX && enc <= POLLINATIONS_URL_SAFE;
+
+  // Soft/Suggestive: Pollinations when no real Horde key, or when Pollinations was selected
+  if ((selected === "pollinations" || !hasRealHordeKey()) && pollOk) {
     return "pollinations";
   }
-  // Default / Horde selected / Soft / Suggestive / NSFW → Horde first
+  // Prompt too long for Pollinations, or user has a real Horde key → Horde
   return "horde";
 }
 
@@ -1275,6 +1287,12 @@ function getHordeKey() {
   if (fromInput) return fromInput;
   const stored = load(KEYS.hordeKey, "");
   return stored || HORDE_ANON_KEY;
+}
+
+/** True only when the user pasted a real Horde key (anon 0000000000 does not count). */
+function hasRealHordeKey() {
+  const k = String(getHordeKey() || "").trim();
+  return !!(k && k !== HORDE_ANON_KEY && k.length >= 8);
 }
 
 function getGroqKey() {
@@ -1618,7 +1636,7 @@ async function generateWithHorde(prompt, aspect, mode, opts) {
     models,
     params,
   };
-  toast("AI Horde queue — good free workers can take 1–3 min…");
+  toast("Queuing free image job — can take 1–3 min…");
   const apikey = getHordeKey();
   const headers = {
     "Content-Type": "application/json",
@@ -1653,7 +1671,7 @@ async function generateWithHorde(prompt, aspect, mode, opts) {
     setHordeQueueStatus(t);
     if (onStatus) onStatus(t);
   };
-  emitStatus("Waiting for AI Horde worker…");
+  emitStatus("Waiting for a worker…");
   const deadline = Date.now() + 360000; // 6 min — NSFW/anonymous queues can be slow
   let done = false;
   let lastCheck = {};
@@ -1688,13 +1706,13 @@ async function generateWithHorde(prompt, aspect, mode, opts) {
     {
       const q = check.queue_position;
       if (check.done) {
-        emitStatus("AI Horde finished — fetching image…");
+        emitStatus("Finished — fetching image…");
       } else if (typeof q === "number" && q > 0) {
-        emitStatus("AI Horde queue #" + q + " (free, hang tight)…");
+        emitStatus("Queue #" + q + " (hang tight)…");
       } else if (check.processing) {
-        emitStatus("AI Horde generating…");
+        emitStatus("Generating…");
       } else {
-        emitStatus("Waiting for AI Horde worker…");
+        emitStatus("Waiting for a worker…");
       }
     }
     if (check.done) {
@@ -1724,8 +1742,16 @@ async function generateWithHorde(prompt, aspect, mode, opts) {
     );
   }
   const gens = (status && status.generations) || [];
-  const img = gens[0] && gens[0].img;
-  if (!img) throw new Error("AI Horde returned no image — workers may have been busy.");
+  const gen0 = gens[0];
+  if (!gen0) throw new Error("Image job returned no generations — workers may have been busy.");
+  // Workers return censored:true with a black placeholder — never treat as success
+  if (gen0.censored) {
+    throw new Error(
+      "Image was censored (black frame). Soften the scene, try Soft mode, or try again."
+    );
+  }
+  const img = gen0.img;
+  if (!img) throw new Error("Image job returned no image data — try again.");
   if (/^https?:\/\//i.test(img)) return img;
   if (img.startsWith("data:")) return img;
   return "data:image/webp;base64," + img;
@@ -1817,6 +1843,9 @@ async function tryFetchImageAsBlobUrl(url) {
   if (!blob || !String(blob.type || "").startsWith("image/")) {
     throw new Error("Not an image");
   }
+  if (blob.size < 800) {
+    throw new Error("Image file too small (likely empty)");
+  }
   const objUrl = URL.createObjectURL(blob);
   state.objectUrls.push(objUrl);
   return objUrl;
@@ -1860,30 +1889,110 @@ function waitImageLoad(url, timeoutMs) {
 }
 
 /**
+ * Reject 0×0, tiny, or near-black (censored placeholder) frames.
+ * Canvas sample is best-effort — CORS-tainted bitmaps skip luminance and still require naturalWidth.
+ */
+async function assertUsableGenImage(url) {
+  const raw = String(url || "").trim();
+  if (!raw) throw new Error("No image URL");
+  await waitImageLoad(raw, 60000);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    let settled = false;
+    const done = (fn) => {
+      if (settled) return;
+      settled = true;
+      try {
+        img.removeAttribute("src");
+      } catch (_) {}
+      fn();
+    };
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || 0;
+        const h = img.naturalHeight || 0;
+        if (w < 32 || h < 32) {
+          done(() => reject(new Error("Image too small (" + w + "×" + h + ")")));
+          return;
+        }
+        const sw = Math.min(48, w);
+        const sh = Math.min(48, h);
+        const canvas = document.createElement("canvas");
+        canvas.width = sw;
+        canvas.height = sh;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) {
+          done(() => resolve(raw));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, sw, sh);
+        let data;
+        try {
+          data = ctx.getImageData(0, 0, sw, sh).data;
+        } catch (_) {
+          // Tainted canvas (cross-origin without CORS) — dimensions already OK
+          done(() => resolve(raw));
+          return;
+        }
+        let sum = 0;
+        let count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] < 16) continue;
+          sum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+          count++;
+        }
+        const avg = count ? sum / count : 0;
+        if (count > 10 && avg < 6) {
+          done(() =>
+            reject(
+              new Error(
+                "Image came back blank/black (likely censored). Soften the scene or try again."
+              )
+            )
+          );
+          return;
+        }
+        done(() => resolve(raw));
+      } catch (err) {
+        done(() => reject(err || new Error("Image validation failed")));
+      }
+    };
+    img.onerror = () => done(() => reject(new Error("Image failed to load in browser")));
+    try {
+      img.referrerPolicy = "no-referrer";
+    } catch (_) {}
+    try {
+      img.crossOrigin = "anonymous";
+    } catch (_) {}
+    img.src = raw;
+  });
+}
+
+/**
  * Prefer a session blob URL when CORS fetch works; otherwise a confirmed https/data URL.
- * Never returns a URL that did not decode in Image().
+ * Never returns a URL that did not decode, or a blank/black censored frame.
  */
 async function confirmAgentImage(url) {
   const raw = String(url || "").trim();
   if (!raw) throw new Error("No image URL");
-  // Blob path: fetch bytes then verify decode
+  // Blob path: fetch bytes then verify decode + not blank
   try {
     const blobUrl = await tryFetchImageAsBlobUrl(raw);
-    await waitImageLoad(blobUrl, 20000);
+    await assertUsableGenImage(blobUrl);
     return {
       chatUrl: blobUrl,
       mediaUrl: /^https?:\/\//i.test(raw) || raw.startsWith("data:") ? raw : blobUrl,
     };
   } catch (_) {}
   // Direct load (works when hotlink displays but CORS fetch is blocked)
-  await waitImageLoad(raw, 60000);
+  await assertUsableGenImage(raw);
   return { chatUrl: raw, mediaUrl: raw };
 }
 
 function softenGenFailToast(extra) {
   toast(
     extra ||
-      "Couldn't load the image. Try Pollinations (free), AI Horde (free NSFW), soften the scene, or generate again."
+      "Couldn't load the image. Soften the scene or generate again."
   );
 }
 
@@ -1892,11 +2001,17 @@ async function runHordeAndShow(imagePrompt, aspect, mode) {
   setGenLoading(true);
   try {
     const url = await generateWithHorde(imagePrompt, aspect, mode);
-    await showGenPreview(url, { allowHordeFallback: false });
+    await showGenPreview(url, {
+      allowHordeFallback: false,
+      imagePrompt,
+      aspect,
+      mode,
+      timeoutMs: 90000,
+    });
   } catch (err) {
-    // Soft/Suggestive: mirror Agent Image Engine — Pollinations fallback after Horde
+    // Soft/Suggestive: Pollinations fallback after queue/censored failure
     if (mode !== "nsfw") {
-      toast("Horde failed — trying Pollinations (free)…");
+      toast("Primary backend failed — trying free fallback…");
       const pollUrl = buildPollinationsUrl(imagePrompt, aspect, mode);
       if (pollUrl.length <= 2200) {
         await showGenPreview(pollUrl, {
@@ -1905,13 +2020,14 @@ async function runHordeAndShow(imagePrompt, aspect, mode) {
           aspect,
           mode,
           timeoutMs: 90000,
+          _triedPollAfterBlank: true,
         });
         return;
       }
     }
     setGenLoading(false);
     state.lastGenUrl = null;
-    toast((err && err.message) || "AI Horde generation failed");
+    toast((err && err.message) || "Image generation failed");
   }
 }
 
@@ -1934,7 +2050,7 @@ function showGenPreview(url, opts) {
       if (state.genLoading) {
         setGenLoading(false);
         state.lastGenUrl = null;
-        toast("Image generation timed out. Try AI Horde or try again.");
+        toast("Image generation timed out. Try again.");
       }
       finish();
     }, opts.timeoutMs || 120000);
@@ -1949,6 +2065,18 @@ function showGenPreview(url, opts) {
       finish();
     };
 
+    const failBlank = (msg) => {
+      clearTimeout(timeout);
+      setGenLoading(false);
+      state.lastGenUrl = null;
+      img.hidden = true;
+      try {
+        img.removeAttribute("src");
+      } catch (_) {}
+      toast(msg || "Image came back empty — try again.");
+      finish();
+    };
+
     const failToHordeOrToast = async () => {
       clearTimeout(timeout);
       if (
@@ -1957,7 +2085,7 @@ function showGenPreview(url, opts) {
         !opts._triedHorde
       ) {
         opts._triedHorde = true;
-        toast("Retrying with AI Horde…");
+        toast("Retrying with free backend…");
         try {
           const hordeUrl = await generateWithHorde(
             opts.imagePrompt,
@@ -1977,7 +2105,7 @@ function showGenPreview(url, opts) {
           img.hidden = true;
           toast(
             (err && err.message) ||
-              "Couldn't load the image. Try Pollinations (free), AI Horde (free NSFW), or soften the scene."
+              "Couldn't load the image. Soften the scene or try again."
           );
           finish();
           return;
@@ -1990,7 +2118,52 @@ function showGenPreview(url, opts) {
       finish();
     };
 
-    img.onload = () => succeed(img.src || url);
+    img.onload = async () => {
+      const candidate = img.src || url;
+      try {
+        await assertUsableGenImage(candidate);
+        succeed(candidate);
+      } catch (err) {
+        // Blank/black or invalid — do not leave Apply edit / Animate as a fake success
+        if (
+          opts.allowHordeFallback &&
+          opts.imagePrompt &&
+          !opts._triedHorde
+        ) {
+          await failToHordeOrToast();
+          return;
+        }
+        // Soft/Suggestive: try Pollinations once if this was a Horde/data URL fail
+        if (
+          !opts._triedPollAfterBlank &&
+          opts.imagePrompt &&
+          opts.mode !== "nsfw"
+        ) {
+          opts._triedPollAfterBlank = true;
+          const pollUrl = buildPollinationsUrl(
+            opts.imagePrompt,
+            opts.aspect,
+            opts.mode
+          );
+          if (pollUrl.length <= 2200) {
+            toast("Blank frame — trying free fallback…");
+            img.onload = async () => {
+              try {
+                await assertUsableGenImage(img.src || pollUrl);
+                succeed(img.src || pollUrl);
+              } catch (e2) {
+                failBlank((e2 && e2.message) || "Image came back empty.");
+              }
+            };
+            img.onerror = () =>
+              failBlank((err && err.message) || "Image came back empty.");
+            img.src = pollUrl;
+            return;
+          }
+        }
+        failBlank((err && err.message) || "Image came back empty.");
+      }
+    };
     img.onerror = async () => {
       if (!opts._triedFetch) {
         opts._triedFetch = true;
@@ -2236,7 +2409,7 @@ async function runStoryboardSet() {
     );
   } else {
     setStoryboardProgress("Storyboard failed — no frames saved", 0, variants.length);
-    toast("Storyboard failed — no frames saved. Try again or check Horde.");
+    toast("Storyboard failed — no frames saved. Try again.");
   }
 }
 
@@ -2298,7 +2471,7 @@ async function generateSceneImage() {
   const url = buildPollinationsUrl(imagePrompt, aspect, mode);
   // Extra guard: Safari often fails on very long GET URLs
   if (url.length > 2200) {
-    toast("Prompt still long for Pollinations — using AI Horde…");
+    toast("Prompt too long for quick path — using queue backend…");
     setGenProvider("horde");
     await runHordeAndShow(imagePrompt, aspect, mode);
     return;

@@ -881,6 +881,14 @@ function lightUpdateGenPreview(url) {
   try {
     img.referrerPolicy = "no-referrer";
   } catch (_) {}
+  img.onerror = () => {
+    img.hidden = true;
+    try {
+      img.removeAttribute("src");
+    } catch (_) {}
+    // Do not keep a fake success still pointing at a broken URL
+    if (state.lastGenUrl === url) state.lastGenUrl = null;
+  };
   img.hidden = false;
   img.src = url;
 }
