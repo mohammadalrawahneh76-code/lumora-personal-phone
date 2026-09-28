@@ -738,6 +738,59 @@
     }
   }
 
+  /** SDXL-friendly sizes for AI Horde (divisible by 64; avoid tiny defaults). */
+  function hordeAspectSize(aspect) {
+    switch (aspect) {
+      case "1:1":
+        return { width: 1024, height: 1024 };
+      case "9:16":
+        return { width: 768, height: 1344 };
+      case "3:4":
+      default:
+        return { width: 832, height: 1216 };
+    }
+  }
+
+  const HORDE_MODELS_SOFT = [
+    "ICBINP - I Can't Believe It's Not Photography",
+    "Realistic Vision",
+    "AbsoluteReality",
+    "Juggernaut XL",
+    "AlbedoBase XL (SDXL)",
+  ];
+  // Photoreal first for NSFW; anime WAI only as fallback secondary
+  const HORDE_MODELS_NSFW = [
+    "ICBINP - I Can't Believe It's Not Photography",
+    "Realistic Vision",
+    "AbsoluteReality",
+    "Juggernaut XL",
+    "WAI-NSFW-illustrious-SDXL",
+  ];
+  const HORDE_NEGATIVE =
+    "extra faces, multiple heads, fused faces, melted skin, blob, amorphous, mutated, deformed, disfigured, bad anatomy, bad hands, extra limbs, duplicate, clone, watermark, text, logo, ugly, lowres, blurry, censored";
+
+  function defaultHordeModels(mode) {
+    // soft + suggestive: photoreal; nsfw: photoreal first, WAI anime only secondary
+    if (mode === "nsfw") return HORDE_MODELS_NSFW.slice();
+    return HORDE_MODELS_SOFT.slice();
+  }
+
+  /** Shape an SD-style positive + negative for AI Horde. Returns `positive ### negative`. */
+  function buildHordePrompt(imagePrompt, mode) {
+    const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
+    const lead =
+      m === "nsfw"
+        ? "photorealistic, raw photo, natural skin texture, skin pores, single adult woman, detailed face, coherent anatomy, one head, sharp focus, 85mm"
+        : "photorealistic portrait, raw photo, natural skin texture, soft lighting, single person, looking at viewer, coherent anatomy, sharp focus, 85mm";
+    let positive = lead + ", " + String(imagePrompt || "").replace(/\s+/g, " ").trim();
+    // Cap positive before negative so total stays reasonable for workers
+    const maxPos = 1400;
+    if (positive.length > maxPos) {
+      positive = positive.slice(0, maxPos).replace(/\s+\S*$/, "") + "…";
+    }
+    return positive + " ### " + HORDE_NEGATIVE;
+  }
+
   function mediaSrc(m) {
     return (m && (m.imageDataUrl || m.imageUrl)) || "";
   }
@@ -1038,29 +1091,42 @@
   }
 
   async function generateWithHorde(prompt, aspect, mode) {
-    const { width, height } = aspectSize(aspect);
+    const { width, height } = hordeAspectSize(aspect);
     const seedEl = $("#genSeed");
     const modelEl = $("#genModel");
     const seedRaw = seedEl ? seedEl.value.trim() : "";
-    const model = modelEl ? modelEl.value.trim() : "";
+    const modelOverride = modelEl ? modelEl.value.trim() : "";
     const allowNsfw = mode === "suggestive" || mode === "nsfw";
+    const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
+    const models = modelOverride ? [modelOverride] : defaultHordeModels(m);
+    // Photoreal defaults use clip_skip 1; only user anime/pony override gets 2
+    const animeOrPony = !!(
+      modelOverride &&
+      /pony|illustrious|anime|hentai|orange.?mix|wai-nsfw/i.test(modelOverride)
+    );
     const params = {
       width,
       height,
       n: 1,
-      steps: 25,
+      steps: 32,
       cfg_scale: 7,
+      sampler_name: "k_euler_a",
+      clip_skip: animeOrPony ? 2 : 1,
     };
     if (seedRaw && /^\d+$/.test(seedRaw)) params.seed = seedRaw;
+    const shaped = buildHordePrompt(prompt, m);
     const body = {
-      prompt,
+      prompt: shaped,
       nsfw: allowNsfw,
       censor_nsfw: !allowNsfw,
       r2: true,
       shared: false,
+      trusted_workers: false,
+      slow_workers: true,
+      models,
       params,
     };
-    if (model) body.models = [model];
+    toast("AI Horde queue — good free workers can take 1–3 min…");
     const apikey = getHordeKey();
     const headers = {
       "Content-Type": "application/json",
