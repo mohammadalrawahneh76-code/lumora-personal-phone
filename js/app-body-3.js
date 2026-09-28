@@ -706,7 +706,12 @@ function renderAgentEnginesPanel() {
   const groqBadge = groqReady ? "ready" : "anon";
   const groqLabel = groqReady ? "ready" : "not set";
   const nvidiaKey = (typeof getNvidiaKey === "function" ? getNvidiaKey() : "") || "";
-  const nvidiaReady = !!nvidiaKey;
+  const openrouterKey =
+    (typeof getOpenRouterKey === "function" ? getOpenRouterKey() : typeof getFeatherlessKey === "function" ? getFeatherlessKey() : "") || "";
+  const nvMetaEarly =
+    typeof getNvidiaModelMeta === "function" ? getNvidiaModelMeta() : null;
+  const lexiSelected = !!(nvMetaEarly && nvMetaEarly.provider === "openrouter");
+  const nvidiaReady = lexiSelected ? !!openrouterKey : !!nvidiaKey;
   const nvidiaBadge = nvidiaReady ? "ready" : "anon";
   const nvidiaLabel = nvidiaReady ? "ready" : "not set";
   const rows = items
@@ -751,13 +756,13 @@ function renderAgentEnginesPanel() {
     (getStylePackId() === "anime" ? ' class="on"' : "") +
     ">Anime</button>" +
     "</div></div>";
-  const nvMeta =
-    typeof getNvidiaModelMeta === "function" ? getNvidiaModelMeta() : null;
+  const nvMeta = nvMetaEarly || (typeof getNvidiaModelMeta === "function" ? getNvidiaModelMeta() : null);
   const nvPick = (nvMeta && nvMeta.id) || "kimi";
   const nvModelLabel = (nvMeta && nvMeta.label) || "Kimi";
   const nvModelId = (nvMeta && nvMeta.model) || "moonshotai/kimi-k3";
+  const nvIsLexi = !!(nvMeta && nvMeta.provider === "openrouter");
   const nvidiaModelSeg =
-    '<div class="seg agent-nvidia-model-seg" id="agentNvidiaModelSeg" role="radiogroup" aria-label="NVIDIA model">' +
+    '<div class="seg agent-nvidia-model-seg" id="agentNvidiaModelSeg" role="radiogroup" aria-label="Agent chat model">' +
     NVIDIA_MODELS.map(function (m) {
       return (
         '<button type="button" data-v="' +
@@ -772,26 +777,39 @@ function renderAgentEnginesPanel() {
       );
     }).join("") +
     "</div>";
+  const engineDetail = nvIsLexi
+    ? nvidiaReady
+      ? "Dolphin (Venice Uncensored) ready via OpenRouter — preferred for Suggestive / NSFW Agent Send"
+      : "Dolphin selected — paste an OpenRouter key below (falls back to Groq / Pollinations)"
+    : nvidiaReady
+      ? "NVIDIA NIM: ready — " + nvModelLabel + " (" + nvModelId + ") preferred for Agent Send"
+      : "NVIDIA NIM: not set (falls back to Groq / Pollinations)";
+  const engineLink = nvIsLexi
+    ? '<a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>'
+    : '<a href="https://build.nvidia.com/models" target="_blank" rel="noopener">build.nvidia.com/models</a>';
   const nvidiaRow =
     '<div class="agent-engine-row agent-nvidia-key-row">' +
-    '<span class="agent-engine-name">NVIDIA NIM (Agent chat)</span>' +
+    '<span class="agent-engine-name">Agent chat models</span>' +
     '<span class="agent-engine-badge ' +
     nvidiaBadge +
     '">' +
     nvidiaLabel +
     "</span>" +
     '<span class="agent-engine-detail">' +
-    (nvidiaReady
-      ? "NVIDIA NIM: ready — " + nvModelLabel + " (" + nvModelId + ") preferred for Agent Send"
-      : "NVIDIA NIM: not set (falls back to Groq / Pollinations)") +
+    engineDetail +
     " · " +
-    '<a href="https://build.nvidia.com/models" target="_blank" rel="noopener">build.nvidia.com/models</a>' +
+    engineLink +
     "</span>" +
     nvidiaModelSeg +
     '<label class="field agent-nvidia-key-field">' +
-    '<span class="label">NVIDIA API key <em>NIM · browser only</em></span>' +
+    '<span class="label">NVIDIA API key <em>NIM · Lightning / Kimi / Ultra</em></span>' +
     '<input type="password" id="agentNvidiaKey" maxlength="300" placeholder="Paste nvapi-… key" autocomplete="off" />' +
-    '<span class="hint">Lightning = fast · Kimi = default multimodal · Ultra = deep reasoning. Same key for all. From <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a>. Stored only in this browser.</span>' +
+    '<span class="hint">Lightning = fast · Kimi = default · Ultra = deep reasoning. From <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a>. Browser only.</span>' +
+    "</label>" +
+    '<label class="field agent-openrouter-key-field">' +
+    '<span class="label">OpenRouter API key <em>Dolphin · uncensored</em></span>' +
+    '<input type="password" id="agentOpenRouterKey" maxlength="300" placeholder="Paste OpenRouter sk-or-… key" autocomplete="off" />' +
+    '<span class="hint">Required when Dolphin is selected. Free key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> (tiny pay-per-use; often free credits). Model: Dolphin Mistral 24B Venice Uncensored. Browser only.</span>' +
     "</label></div>";
   const groqRow =
     '<div class="agent-engine-row agent-groq-key-row">' +
@@ -843,6 +861,23 @@ function renderAgentEnginesPanel() {
     nvidiaInput.addEventListener("change", persistNv);
     nvidiaInput.addEventListener("blur", persistNv);
   }
+  const openrouterInput = $("#agentOpenRouterKey");
+  if (openrouterInput) {
+    const storedOr = load(KEYS.openrouterKey, "") || load(KEYS.featherlessKey, "") || "";
+    if (storedOr && !openrouterInput.value) openrouterInput.value = storedOr;
+    const persistOr = () => {
+      const v = openrouterInput.value.trim();
+      if (v) save(KEYS.openrouterKey, v);
+      else {
+        try {
+          localStorage.removeItem(KEYS.openrouterKey);
+        } catch (_) {}
+      }
+      renderAgentEnginesPanel();
+    };
+    openrouterInput.addEventListener("change", persistOr);
+    openrouterInput.addEventListener("blur", persistOr);
+  }
   const nvidiaModelSegEl = $("#agentNvidiaModelSeg");
   if (nvidiaModelSegEl && !nvidiaModelSegEl.dataset.bound) {
     nvidiaModelSegEl.dataset.bound = "1";
@@ -851,7 +886,8 @@ function renderAgentEnginesPanel() {
       if (!b) return;
       setNvidiaModel(b.dataset.v);
       renderAgentEnginesPanel();
-      toast("NVIDIA model: " + (getNvidiaModelMeta().label || b.dataset.v));
+      const meta = getNvidiaModelMeta();
+      toast("Agent model: " + ((meta && meta.label) || b.dataset.v));
     });
   }
   const groqInput = $("#agentGroqKey");

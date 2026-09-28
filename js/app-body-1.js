@@ -969,21 +969,37 @@ const NVIDIA_MODELS = [
     id: "lightning",
     label: "Lightning",
     model: "nvidia/nemotron-3.5-lightning-30b-a3b",
+    provider: "nvidia",
     blurb: "Fast daily Soft / Suggestive",
   },
   {
     id: "kimi",
     label: "Kimi",
     model: "moonshotai/kimi-k3",
+    provider: "nvidia",
     blurb: "Balanced multimodal (default)",
   },
   {
     id: "ultra",
     label: "Ultra",
     model: "nvidia/nemotron-3-ultra-550b-a55b",
+    provider: "nvidia",
     blurb: "Heavy reasoning / long threads",
   },
+  {
+    id: "lexi",
+    label: "Dolphin",
+    model: "cognitivecomputations/dolphin-mistral-24b-venice-edition",
+    provider: "openrouter",
+    blurb: "Uncensored NSFW / roleplay (OpenRouter · Venice Dolphin)",
+  },
 ];
+const OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_APP_URL = "https://mohammadalrawahneh76-code.github.io/lumora-personal-phone/";
+const OPENROUTER_APP_TITLE = "Lumora Personal";
+const FEATHERLESS_API = "https://api.featherless.ai/v1/chat/completions";
+const FEATHERLESS_APP_URL = OPENROUTER_APP_URL;
+const FEATHERLESS_APP_TITLE = OPENROUTER_APP_TITLE;
 const NVIDIA_MODEL_DEFAULT = "kimi";
 
 const GROQ_MODELS = [
@@ -1239,6 +1255,16 @@ function getNvidiaKey() {
   const fromInput = el ? el.value.trim() : "";
   if (fromInput) return fromInput;
   return load(KEYS.nvidiaKey, "") || "";
+}
+
+function getOpenRouterKey() {
+  const el = $("#agentOpenRouterKey") || $("#agentFeatherlessKey");
+  const fromInput = el ? el.value.trim() : "";
+  if (fromInput) return fromInput;
+  return load(KEYS.openrouterKey, "") || load(KEYS.featherlessKey, "") || "";
+}
+function getFeatherlessKey() {
+  return getOpenRouterKey();
 }
 
 function getNvidiaModelId() {
