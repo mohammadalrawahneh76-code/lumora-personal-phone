@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="./style.css?v=20260928p" />
+<link rel="stylesheet" href="./style.css?v=20260928q" />
 </head>
 <body>
 <button class="skip" onclick="document.getElementById('main').focus()">Skip to content</button>
@@ -636,7 +636,7 @@
               <option value="gemini-3-pro-image-preview"></option>
             </datalist>
           </label>
-          <p class="hint">BluesMinds key from api.bluesminds.com/console/token · chat default <code>gemma-4-26b</code> · image default <code>gpt-image-1</code>. Same key for chat + Generate. If a model fails, try another id from this list or your console Model Square / ratio_config.</p>
+          <p class="hint">BluesMinds key from api.bluesminds.com/console/token · chat default <code>gemma-4-26b</code> · image default <code>gpt-image-1</code>. Same key for chat + Generate. If a model has no channel, Generate auto-tries the next id (Grok / Gemini). Working model is saved here. All fail → enable an image model in the BluesMinds dashboard for your key’s group.</p>
         </div>
         <div class="seg agent-mode-seg" id="agentModeSeg" role="radiogroup" aria-label="Agent mode">
           <button type="button" class="on" data-v="studio">Studio</button>
@@ -796,6 +796,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js?v=20260928p"></script>
+<script type="module" src="./js/app.js?v=20260928q"></script>
 </body>
 </html>

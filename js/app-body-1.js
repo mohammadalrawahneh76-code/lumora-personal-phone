@@ -1284,6 +1284,35 @@ function getBluesmindsImageModel() {
   return stored || BLUESMINDS_IMAGE_MODEL_DEFAULT;
 }
 
+/** Persist a working image model to the Agent input + localStorage. */
+function setBluesmindsImageModel(model) {
+  const m = String(model || "").trim();
+  if (!m) return;
+  const el = $("#agentBluesmindsImageModel");
+  if (el) el.value = m;
+  if (KEYS.bluesmindsImageModel) save(KEYS.bluesmindsImageModel, m);
+}
+
+/**
+ * Ordered try list: preferred model first, then FALLBACKS (unique, once each).
+ * Cap = length of this chain (one attempt per model).
+ */
+function bluesmindsImageModelChain(preferred) {
+  const start =
+    String(preferred || "").trim() || BLUESMINDS_IMAGE_MODEL_DEFAULT;
+  const seen = new Set();
+  const chain = [];
+  const push = (m) => {
+    const id = String(m || "").trim();
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    chain.push(id);
+  };
+  push(start);
+  BLUESMINDS_IMAGE_MODEL_FALLBACKS.forEach(push);
+  return chain;
+}
+
 /** Suggest a different image model than the one that just failed. */
 function bluesmindsImageFallbackSuggestion(failedModel) {
   const failed = String(failedModel || "").trim();
@@ -1340,7 +1369,9 @@ function isBluesmindsModelUnavailable(status, msg) {
 /**
  * BluesMinds OpenAI-compatible images/generations.
  * Docs: { model, prompt, n, size } — default gpt-image-1, size 1024x1024.
- * Returns a data: URL or https URL suitable for preview / assertUsableGenImage.
+ * Auto-fallback: on "no available channel" / model unavailable, retry the next
+ * id in BLUESMINDS_IMAGE_MODEL_FALLBACKS (once per model). Persist + toast the
+ * working model. Returns a data: URL or https URL for preview / assertUsableGenImage.
  */
 async function generateWithBluesminds(prompt, aspect, mode, opts) {
   opts = opts || {};
@@ -1351,14 +1382,13 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
       "Paste your BluesMinds key under Agent → Chat (same key for images)."
     );
   }
-  const model = getBluesmindsImageModel();
+  const preferred = getBluesmindsImageModel();
+  const chain = bluesmindsImageModelChain(preferred);
   const size = bluesmindsAspectSize(aspect);
   const shaped = String(prompt || "").trim();
   if (!shaped) throw new Error("Describe a scene first");
 
-  if (onStatus) onStatus("BluesMinds · generating…");
-
-  async function postOnce(includeSize, includeResponseFormat) {
+  async function postOnce(model, includeSize, includeResponseFormat) {
     const payload = { model: model, prompt: shaped, n: 1 };
     if (includeSize) payload.size = size;
     if (includeResponseFormat) payload.response_format = "b64_json";
@@ -1388,6 +1418,7 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
       err.status = res.status;
       err.body = textMsg;
       err.raw = data;
+      err.model = model;
       throw err;
     }
     const item =
@@ -1406,81 +1437,121 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
     throw new Error("BluesMinds response missing b64_json and url");
   }
 
-  function wrapModelUnavailable(err) {
-    const apiMsg = String((err && (err.body || err.message)) || "").trim();
-    const suggest = bluesmindsImageFallbackSuggestion(model);
-    let out =
-      "BluesMinds image model unavailable (" +
-      model +
-      ")";
-    if (apiMsg && apiMsg.toLowerCase().indexOf("unavailable") < 0) {
-      out += ": " + apiMsg.slice(0, 160);
-    }
-    if (suggest) {
-      out += " — try " + suggest + " under Agent → Image model.";
-    } else {
-      out += " — pick another id from Agent → Image model (see api.bluesminds.com/pricing).";
-    }
-    const wrapped = new Error(out);
-    wrapped.status = err && err.status;
-    wrapped.body = apiMsg;
-    return wrapped;
-  }
+  /** Try one model with payload-shape retries (size / response_format). */
+  async function tryModel(model) {
+    try {
+      return await postOnce(model, true, true);
+    } catch (err) {
+      const msg = String((err && err.message) || "");
+      const status = err && err.status;
 
-  try {
-    return await postOnce(true, true);
-  } catch (err) {
-    const msg = String((err && err.message) || "");
-    const status = err && err.status;
+      if (status === 401 || status === 403) {
+        throw new Error(
+          "Invalid BluesMinds key — paste it under Agent → Chat (api.bluesminds.com/console/token)."
+        );
+      }
+      if (status === 429) {
+        throw new Error("BluesMinds rate limit — wait a moment and try again.");
+      }
+      // Channel / model routing — bubble for outer fallback loop
+      if (isBluesmindsModelUnavailable(status, msg)) {
+        err.channelUnavailable = true;
+        throw err;
+      }
 
-    // Retry without response_format / size when the gateway rejects those fields
-    const retryShape =
-      status === 400 ||
-      /size|response_format|b64|invalid|unsupported|not support|unknown parameter/i.test(
-        msg
-      );
-    if (retryShape && !isBluesmindsModelUnavailable(status, msg)) {
+      // Retry without response_format / size when the gateway rejects those fields
+      const retryShape =
+        status === 400 ||
+        /size|response_format|b64|invalid|unsupported|not support|unknown parameter/i.test(
+          msg
+        );
+      if (!retryShape) throw err;
+
       try {
         if (onStatus) onStatus("BluesMinds · retrying with simpler payload…");
-        return await postOnce(true, false);
+        return await postOnce(model, true, false);
       } catch (err2) {
         const msg2 = String((err2 && err2.message) || "");
         const status2 = err2 && err2.status;
+        if (isBluesmindsModelUnavailable(status2, msg2)) {
+          err2.channelUnavailable = true;
+          throw err2;
+        }
         if (
-          (status2 === 400 || /size|invalid|unsupported|not support/i.test(msg2)) &&
-          !isBluesmindsModelUnavailable(status2, msg2)
+          status2 === 400 ||
+          /size|invalid|unsupported|not support/i.test(msg2)
         ) {
           if (onStatus) onStatus("BluesMinds · retrying without size…");
           try {
-            return await postOnce(false, false);
+            return await postOnce(model, false, false);
           } catch (err3) {
-            if (isBluesmindsModelUnavailable(err3 && err3.status, err3 && err3.message)) {
-              throw wrapModelUnavailable(err3);
+            if (
+              isBluesmindsModelUnavailable(err3 && err3.status, err3 && err3.message)
+            ) {
+              err3.channelUnavailable = true;
+              throw err3;
             }
             throw err3;
           }
         }
-        if (isBluesmindsModelUnavailable(status2, msg2)) {
-          throw wrapModelUnavailable(err2);
-        }
         throw err2;
       }
     }
+  }
 
-    if (status === 401 || status === 403) {
-      throw new Error(
-        "Invalid BluesMinds key — paste it under Agent → Chat (api.bluesminds.com/console/token)."
+  function allChannelsFailedMessage(tried, lastErr) {
+    const apiMsg = String(
+      (lastErr && (lastErr.body || lastErr.message)) || ""
+    ).trim();
+    let out =
+      "BluesMinds has no image channel enabled for this API key’s group — open the BluesMinds dashboard and enable an image model, or paste a working model id under Agent → Image model.";
+    if (tried && tried.length) {
+      out += " Tried: " + tried.join(", ") + ".";
+    }
+    if (apiMsg) out += " Last API: " + apiMsg.slice(0, 160);
+    const wrapped = new Error(out);
+    wrapped.status = lastErr && lastErr.status;
+    wrapped.body = apiMsg;
+    wrapped.allChannelsFailed = true;
+    return wrapped;
+  }
+
+  let lastChannelErr = null;
+  const tried = [];
+
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    tried.push(model);
+    if (onStatus) {
+      onStatus(
+        i === 0
+          ? "BluesMinds · " + model + "…"
+          : "Trying " + model + "…"
       );
     }
-    if (status === 429) {
-      throw new Error("BluesMinds rate limit — wait a moment and try again.");
+    try {
+      const url = await tryModel(model);
+      if (model !== preferred) {
+        setBluesmindsImageModel(model);
+        toast("Image via " + model);
+      }
+      return url;
+    } catch (err) {
+      // Auth / rate-limit: stop immediately (already rethrown as clear Error)
+      const msg = String((err && err.message) || "");
+      if (/Invalid BluesMinds key|rate limit/i.test(msg) && !err.channelUnavailable) {
+        throw err;
+      }
+      if (err && err.channelUnavailable) {
+        lastChannelErr = err;
+        continue; // next model in chain
+      }
+      // NSFW / policy / other real API errors — surface, do not burn through models
+      throw err;
     }
-    if (isBluesmindsModelUnavailable(status, msg)) {
-      throw wrapModelUnavailable(err);
-    }
-    // Surface real API body (NSFW/policy/etc.) instead of a misleading model toast
-    throw err;
   }
+
+  throw allChannelsFailedMessage(tried, lastChannelErr);
 }
 
 function getNvidiaKey() {

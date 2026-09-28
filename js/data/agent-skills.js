@@ -207,7 +207,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "BluesMinds Agent chat",
     description: "BluesMinds key for Agent chat + Generate images",
     body:
-      "Agent chat and Generate images both use BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Chat default gemma-4-26b; image default gpt-image-1 (overridable). Never suggest Horde, Pollinations, NVIDIA Flux, or paid xAI Grok Imagine as backends.",
+      "Agent chat and Generate images both use BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Chat default gemma-4-26b; image default gpt-image-1 (overridable). If an image model has no channel, Generate auto-falls back through the Agent image-model list and persists the working id. Never suggest Horde, Pollinations, NVIDIA Flux, or paid xAI Grok Imagine as backends.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -225,7 +225,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "BluesMinds image routing",
     description: "BluesMinds only for Soft/Suggestive/NSFW images",
     body:
-      "All images go through BluesMinds (same key as Agent chat). Soft/Suggestive/NSFW modes only change the prompt ladder. Never treat blank/black/censored frames as success. Never suggest Horde, Pollinations, Flux, or paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate.",
+      "All images go through BluesMinds (same key as Agent chat). Soft/Suggestive/NSFW modes only change the prompt ladder. Channel/unavailable errors auto-retry the next image model id; if all fail, tell the user to enable an image model in the BluesMinds dashboard for their key’s group. Never treat blank/black/censored frames as success. Never suggest Horde, Pollinations, Flux, or paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate.",
     enabled: true,
     modes: ["studio", "both"],
   },

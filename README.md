@@ -23,7 +23,7 @@ ES modules require HTTP (not `file://`).
 | **Library** | Media · Calendar · Checklist |
 | **Agent** | Chat · Skills |
 
-**BluesMinds** is the only AI backend. Agent **Chat** and **Generate** images both use `api.bluesminds.com` with the same key (`aips_bluesminds_key`, paste under Agent → Chat). Chat default: `gemma-4-26b`. Image default: `gpt-image-1` via `POST /v1/images/generations` (on BluesMinds ratio_config; overridable under Agent → Image model). No Horde, Pollinations, or Flux.
+**BluesMinds** is the only AI backend. Agent **Chat** and **Generate** images both use `api.bluesminds.com` with the same key (`aips_bluesminds_key`, paste under Agent → Chat). Chat default: `gemma-4-26b`. Image default: `gpt-image-1` via `POST /v1/images/generations` (overridable under Agent → Image model). On “no available channel”, Generate auto-tries grok-imagine-image-lite → Gemini image ids and saves the working model. No Horde, Pollinations, or Flux.
 
 ## Project structure
 
