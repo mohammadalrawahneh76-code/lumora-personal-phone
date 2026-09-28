@@ -963,7 +963,28 @@ const HORDE_ANON_KEY = "0000000000";
 const HORDE_API = "https://stablehorde.net/api/v2";
 const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
 const NVIDIA_API = "https://integrate.api.nvidia.com/v1/chat/completions";
-const NVIDIA_MODEL = "moonshotai/kimi-k3";
+/** NVIDIA NIM chat models for Agent (same API key). */
+const NVIDIA_MODELS = [
+  {
+    id: "lightning",
+    label: "Lightning",
+    model: "nvidia/nemotron-3.5-lightning-30b-a3b",
+    blurb: "Fast daily Soft / Suggestive",
+  },
+  {
+    id: "kimi",
+    label: "Kimi",
+    model: "moonshotai/kimi-k3",
+    blurb: "Balanced multimodal (default)",
+  },
+  {
+    id: "ultra",
+    label: "Ultra",
+    model: "nvidia/nemotron-3-ultra-550b-a55b",
+    blurb: "Heavy reasoning / long threads",
+  },
+];
+const NVIDIA_MODEL_DEFAULT = "kimi";
 
 const GROQ_MODELS = [
   "llama-3.3-70b-versatile",
@@ -1218,6 +1239,35 @@ function getNvidiaKey() {
   const fromInput = el ? el.value.trim() : "";
   if (fromInput) return fromInput;
   return load(KEYS.nvidiaKey, "") || "";
+}
+
+function getNvidiaModelId() {
+  const el = $("#agentNvidiaModelSeg");
+  if (el) {
+    const on = el.querySelector("button.on");
+    if (on && on.dataset.v) return on.dataset.v;
+  }
+  const stored = load(KEYS.nvidiaModel, NVIDIA_MODEL_DEFAULT) || NVIDIA_MODEL_DEFAULT;
+  return NVIDIA_MODELS.some((m) => m.id === stored) ? stored : NVIDIA_MODEL_DEFAULT;
+}
+
+function getNvidiaModelMeta() {
+  const id = getNvidiaModelId();
+  return (
+    NVIDIA_MODELS.find((m) => m.id === id) ||
+    NVIDIA_MODELS.find((m) => m.id === NVIDIA_MODEL_DEFAULT)
+  );
+}
+
+function setNvidiaModel(id) {
+  const meta = NVIDIA_MODELS.find((m) => m.id === id);
+  const use = meta ? meta.id : NVIDIA_MODEL_DEFAULT;
+  save(KEYS.nvidiaModel, use);
+  const seg = $("#agentNvidiaModelSeg");
+  if (seg) {
+    $$("button", seg).forEach((b) => b.classList.toggle("on", b.dataset.v === use));
+  }
+  return use;
 }
 
 function sleep(ms) {

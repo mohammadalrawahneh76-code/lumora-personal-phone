@@ -751,9 +751,30 @@ function renderAgentEnginesPanel() {
     (getStylePackId() === "anime" ? ' class="on"' : "") +
     ">Anime</button>" +
     "</div></div>";
+  const nvMeta =
+    typeof getNvidiaModelMeta === "function" ? getNvidiaModelMeta() : null;
+  const nvPick = (nvMeta && nvMeta.id) || "kimi";
+  const nvModelLabel = (nvMeta && nvMeta.label) || "Kimi";
+  const nvModelId = (nvMeta && nvMeta.model) || "moonshotai/kimi-k3";
+  const nvidiaModelSeg =
+    '<div class="seg agent-nvidia-model-seg" id="agentNvidiaModelSeg" role="radiogroup" aria-label="NVIDIA model">' +
+    NVIDIA_MODELS.map(function (m) {
+      return (
+        '<button type="button" data-v="' +
+        m.id +
+        '"' +
+        (nvPick === m.id ? ' class="on"' : "") +
+        ' title="' +
+        esc(m.blurb) +
+        '">' +
+        esc(m.label) +
+        "</button>"
+      );
+    }).join("") +
+    "</div>";
   const nvidiaRow =
     '<div class="agent-engine-row agent-nvidia-key-row">' +
-    '<span class="agent-engine-name">NVIDIA Kimi (Agent chat)</span>' +
+    '<span class="agent-engine-name">NVIDIA NIM (Agent chat)</span>' +
     '<span class="agent-engine-badge ' +
     nvidiaBadge +
     '">' +
@@ -761,15 +782,16 @@ function renderAgentEnginesPanel() {
     "</span>" +
     '<span class="agent-engine-detail">' +
     (nvidiaReady
-      ? "NVIDIA NIM: ready — moonshotai/kimi-k3 preferred for Agent Send"
+      ? "NVIDIA NIM: ready — " + nvModelLabel + " (" + nvModelId + ") preferred for Agent Send"
       : "NVIDIA NIM: not set (falls back to Groq / Pollinations)") +
     " · " +
-    '<a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a>' +
+    '<a href="https://build.nvidia.com/models" target="_blank" rel="noopener">build.nvidia.com/models</a>' +
     "</span>" +
+    nvidiaModelSeg +
     '<label class="field agent-nvidia-key-field">' +
     '<span class="label">NVIDIA API key <em>NIM · browser only</em></span>' +
     '<input type="password" id="agentNvidiaKey" maxlength="300" placeholder="Paste nvapi-… key" autocomplete="off" />' +
-    '<span class="hint">From <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a> → Generate API Key. Stored only in this browser. Prefer over Groq when set.</span>' +
+    '<span class="hint">Lightning = fast · Kimi = default multimodal · Ultra = deep reasoning. Same key for all. From <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a>. Stored only in this browser.</span>' +
     "</label></div>";
   const groqRow =
     '<div class="agent-engine-row agent-groq-key-row">' +
@@ -820,6 +842,17 @@ function renderAgentEnginesPanel() {
     };
     nvidiaInput.addEventListener("change", persistNv);
     nvidiaInput.addEventListener("blur", persistNv);
+  }
+  const nvidiaModelSegEl = $("#agentNvidiaModelSeg");
+  if (nvidiaModelSegEl && !nvidiaModelSegEl.dataset.bound) {
+    nvidiaModelSegEl.dataset.bound = "1";
+    nvidiaModelSegEl.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-v]");
+      if (!b) return;
+      setNvidiaModel(b.dataset.v);
+      renderAgentEnginesPanel();
+      toast("NVIDIA model: " + (getNvidiaModelMeta().label || b.dataset.v));
+    });
   }
   const groqInput = $("#agentGroqKey");
   if (groqInput) {

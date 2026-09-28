@@ -288,16 +288,11 @@ function friendlyTextApiError(err, label) {
 }
 
 function extractChatContent(data) {
-  return (
-    (data &&
-      data.choices &&
-      data.choices[0] &&
-      data.choices[0].message &&
-      data.choices[0].message.content) ||
-    (data && data.response) ||
-    (data && data.text) ||
-    ""
-  );
+  const msg =
+    data && data.choices && data.choices[0] && data.choices[0].message;
+  const content = (msg && msg.content) || "";
+  const reasoning = (msg && (msg.reasoning_content || msg.reasoning)) || "";
+  return content || reasoning || (data && data.response) || (data && data.text) || "";
 }
 
 function groqErrorMessage(status, json) {
@@ -327,6 +322,9 @@ async function callNvidiaChat(messages) {
   if (!key) {
     throw new Error("Add an NVIDIA NIM key in Agent → Engines (build.nvidia.com).");
   }
+  const meta = typeof getNvidiaModelMeta === "function" ? getNvidiaModelMeta() : null;
+  const modelId = (meta && meta.model) || "moonshotai/kimi-k3";
+  const pickId = (meta && meta.id) || "kimi";
   // Normalize OpenAI-style messages; keep string content (vision parts optional later)
   const normalized = (messages || []).map((m) => {
     const role = m.role || "user";
@@ -338,6 +336,18 @@ async function callNvidiaChat(messages) {
     }
     return { role, content };
   });
+  const payload = {
+    model: modelId,
+    messages: normalized,
+    max_tokens: pickId === "ultra" ? 4096 : 2048,
+    temperature: 0.7,
+    stream: false,
+  };
+  if (pickId === "kimi") {
+    payload.reasoning_effort = "low";
+  } else {
+    payload.chat_template_kwargs = { enable_thinking: pickId === "ultra" };
+  }
   let res;
   try {
     res = await fetch(NVIDIA_API, {
@@ -349,14 +359,7 @@ async function callNvidiaChat(messages) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        model: NVIDIA_MODEL,
-        messages: normalized,
-        max_tokens: 2048,
-        temperature: 0.7,
-        stream: false,
-        reasoning_effort: "low",
-      }),
+      body: JSON.stringify(payload),
     });
   } catch (err) {
     throw new Error(
