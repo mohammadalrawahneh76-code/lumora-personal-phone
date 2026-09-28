@@ -1159,10 +1159,17 @@ function setGenProvider(provider) {
     provider === "flux" ? "flux" : provider === "horde" ? "horde" : "pollinations";
   const el = $("#genProvider");
   if (el) el.value = p;
+  const seg = $("#genProviderSeg");
+  if (seg) {
+    $$("button", seg).forEach((b) => b.classList.toggle("on", b.dataset.v === p));
+  }
   save(KEYS.genProvider, p);
   syncHordeKeyVisibility();
   syncUseHordeBtn();
   syncFluxModelVisibility();
+  if (p === "flux" && typeof getNvidiaKey === "function" && !getNvidiaKey()) {
+    toast("Flux selected — paste NVIDIA NIM key in Agent → Engines");
+  }
   return p;
 }
 

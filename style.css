@@ -1263,3 +1263,6 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
   .topbar-right { gap: 6px; }
   .topbar-right .btn-sm { padding-inline: 10px; }
 }
+
+.gen-provider-visible { margin: 8px 0 12px; }
+.gen-provider-visible .seg { flex-wrap: wrap; }

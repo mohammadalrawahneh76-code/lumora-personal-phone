@@ -375,24 +375,39 @@ function boot() {
     storyboardBtn.addEventListener("click", () => runStoryboardSet());
   }
   const providerEl = $("#genProvider");
-  if (providerEl) {
+  const providerSeg = $("#genProviderSeg");
+  {
     let storedProvider = load(KEYS.genProvider, "horde") || "horde";
     const initialMode = load(KEYS.genMode, "soft");
-    // Migrate legacy paid Grok (xAI) → Horde; default Horde (free Soft-first)
-    if (storedProvider === "grok") {
-      storedProvider = "horde";
+    if (storedProvider === "grok") storedProvider = "horde";
+    let initial =
+      storedProvider === "flux"
+        ? "flux"
+        : storedProvider === "pollinations" && initialMode !== "nsfw"
+          ? "pollinations"
+          : "horde";
+    if (providerEl) {
+      providerEl.value = initial;
+      providerEl.addEventListener("change", () => {
+        setGenProvider(providerEl.value);
+      });
     }
-    if (storedProvider === "flux") {
-      providerEl.value = "flux";
-    } else if (storedProvider === "pollinations" && initialMode !== "nsfw") {
-      providerEl.value = "pollinations";
-    } else {
-      providerEl.value = "horde";
+    if (providerSeg && !providerSeg.dataset.bound) {
+      providerSeg.dataset.bound = "1";
+      providerSeg.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b || !b.dataset.v) return;
+        setGenProvider(b.dataset.v);
+        toast(
+          b.dataset.v === "flux"
+            ? "Provider: Flux (Schnell/Kontext)"
+            : b.dataset.v === "pollinations"
+              ? "Provider: Pollinations"
+              : "Provider: AI Horde"
+        );
+      });
     }
-    save(KEYS.genProvider, providerEl.value);
-    providerEl.addEventListener("change", () => {
-      setGenProvider(providerEl.value);
-    });
+    setGenProvider(initial);
   }
   const fluxSeg = $("#genFluxModelSeg");
   if (fluxSeg && !fluxSeg.dataset.bound) {

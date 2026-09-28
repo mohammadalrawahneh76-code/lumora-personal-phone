@@ -430,26 +430,34 @@
             </div>
             <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
           </div>
-          <p class="gen-api-note">NVIDIA Flux (NIM key) preferred when selected · else Horde → Pollinations. Adult fictional 21+ only.</p>
+          <p class="gen-api-note">Tap a provider below. Flux needs your NVIDIA key (Agent → Engines). Both Schnell + Kontext ship; Schnell is default.</p>
+          <div class="field gen-provider-visible">
+            <span class="label">Image provider</span>
+            <div class="seg" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
+              <button type="button" data-v="flux">Flux</button>
+              <button type="button" class="on" data-v="horde">Horde</button>
+              <button type="button" data-v="pollinations">Pollinations</button>
+            </div>
+          </div>
+          <div class="field" id="genFluxModelField" hidden>
+            <span class="label">Flux model</span>
+            <div class="seg" id="genFluxModelSeg" role="radiogroup" aria-label="Flux model">
+              <button type="button" class="on" data-v="schnell">Schnell</button>
+              <button type="button" data-v="kontext">Kontext</button>
+            </div>
+            <span class="hint">Schnell = new image. Kontext = edit last image. Same NIM key as Agent.</span>
+          </div>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
-              <label class="field">
+              <label class="field" hidden>
                 <span class="label">Provider</span>
                 <select id="genProvider">
-                  <option value="flux">NVIDIA Flux (NIM key · Schnell / Kontext)</option>
-                  <option value="horde" selected>AI Horde (free · Soft/Suggestive/NSFW)</option>
-                  <option value="pollinations">Pollinations (free Soft/Suggestive fallback)</option>
+                  <option value="flux">NVIDIA Flux</option>
+                  <option value="horde" selected>AI Horde</option>
+                  <option value="pollinations">Pollinations</option>
                 </select>
               </label>
-              <div class="field" id="genFluxModelField" hidden>
-                <span class="label">Flux model <em>NIM · same key as Agent</em></span>
-                <div class="seg" id="genFluxModelSeg" role="radiogroup" aria-label="Flux model">
-                  <button type="button" class="on" data-v="schnell">Schnell</button>
-                  <button type="button" data-v="kontext">Kontext</button>
-                </div>
-                <span class="hint">Schnell = fast text→image. Kontext = edit last image (needs a prior gen). Key from <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a> — browser only.</span>
-              </div>
               <label class="field" id="genHordeKeyField">
                 <span class="label">Free AI Horde API key <em>optional · still $0</em></span>
                 <input type="text" id="genHordeKey" maxlength="64" placeholder="Leave blank for anonymous" autocomplete="off" />
