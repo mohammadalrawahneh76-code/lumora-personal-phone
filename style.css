@@ -335,7 +335,6 @@ button.credits { cursor: pointer; }
 .ws-group.on {
   color: var(--bg); background: var(--accent);
 }
-
 .ws-tabs {
   display: flex; gap: 4px; overflow-x: auto; margin: 6px 0 20px;
   padding-bottom: 4px; scrollbar-width: none; border-bottom: 1px solid var(--line);
@@ -702,6 +701,16 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 }
 .agent-bubble.assistant.has-image { max-width: 96%; }
 #agentGenBtn.is-loading { opacity: 0.7; pointer-events: none; }
+
+
+.agent-nvidia-key-row .agent-nvidia-model-seg {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+.agent-nvidia-model-seg button {
+  flex: 1;
+  min-width: 0;
+}
 
 .agent-engines-box {
   margin-top: 14px;
