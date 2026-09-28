@@ -90,7 +90,7 @@
       <ol class="steps">
         <li><span class="num">01</span><h3>Design the character</h3><p>Pick niche, look chips, and a master appearance string. Or start with Lila Bloom.</p></li>
         <li><span class="num">02</span><h3>Build prompts &amp; captions</h3><p>Scene library with soft / suggestive / NSFW moods. Generate a preview via a free public image API, or copy master + scene into any other tool.</p></li>
-        <li><span class="num">03</span><h3>Plan &amp; track</h3><p>Calendar ideas, daily checklist, and a media library for in-app generations plus notes from elsewhere.</p></li>
+        <li><span class="num">03</span><h3>Library &amp; track</h3><p>Media library, calendar ideas, and a daily checklist for in-app generations plus notes from elsewhere.</p></li>
       </ol>
       <div class="personal-banner">
         <strong>Personal use only.</strong> No sign-in, no billing, no credits, no backend. Export a JSON backup anytime — clearing browser data for this file’s origin erases local studio data.
@@ -243,18 +243,20 @@
       <nav class="ws-groups" id="wsGroups" role="tablist" aria-label="Workspace sections">
         <button type="button" class="ws-group on" role="tab" data-group="look" aria-selected="true">Look</button>
         <button type="button" class="ws-group" role="tab" data-group="create" aria-selected="false">Create</button>
-        <button type="button" class="ws-group" role="tab" data-group="plan" aria-selected="false">Plan</button>
+        <button type="button" class="ws-group" role="tab" data-group="library" aria-selected="false">Library</button>
         <button type="button" class="ws-group" role="tab" data-group="agent" aria-selected="false">Agent</button>
       </nav>
       <nav class="ws-tabs" id="wsTabs" role="tablist" aria-label="Workspace tools">
         <button type="button" class="ws-tab on" role="tab" data-tab="bible" data-group="look" aria-controls="panel-bible" aria-selected="true">Bible</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="prompts" data-group="create" aria-controls="panel-prompts" aria-selected="false" hidden>Prompts</button>
         <button type="button" class="ws-tab" role="tab" data-tab="generate" data-group="create" aria-controls="panel-generate" aria-selected="false" hidden>Generate</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="captions" data-group="create" aria-controls="panel-captions" aria-selected="false" hidden>Captions</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="calendar" data-group="plan" aria-controls="panel-calendar" aria-selected="false" hidden>Calendar</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="checklist" data-group="plan" aria-controls="panel-checklist" aria-selected="false" hidden>Checklist</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="media" data-group="plan" aria-controls="panel-media" aria-selected="false" hidden>Media</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="agent" data-group="agent" aria-controls="panel-agent" aria-selected="false" hidden>Chat &amp; engines</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="captions" data-group="create" aria-controls="panel-captions" aria-selected="false" hidden>Scripts</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="prompts" data-group="create" aria-controls="panel-prompts" aria-selected="false" hidden>Prompts</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="media" data-group="library" aria-controls="panel-media" aria-selected="false" hidden>Media</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="calendar" data-group="library" aria-controls="panel-calendar" aria-selected="false" hidden>Calendar</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="checklist" data-group="library" aria-controls="panel-checklist" aria-selected="false" hidden>Checklist</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="agent" data-group="agent" aria-controls="panel-agent" aria-selected="false" hidden>Chat</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="skills" data-group="agent" aria-controls="panel-skills" aria-selected="false" hidden>Skills</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="providers" data-group="agent" aria-controls="panel-providers" aria-selected="false" hidden>Providers</button>
       </nav>
 
       <!-- Bible -->
@@ -360,6 +362,7 @@
               <div class="prompt-pills director-pills" id="directorPills" aria-label="Director shot pills"></div>
             </div>
           </details>
+          <div class="hub-section" id="genSceneSection"><h3 class="hub-section-title">Scene</h3>
           <textarea id="sceneInput" rows="3" maxlength="800" placeholder="Describe the scene, outfit and mood…"></textarea>
           <details class="gen-steal-group" id="dressDuoGroup">
             <summary>Dress &amp; Duo</summary>
@@ -400,47 +403,70 @@
             </div>
           </details>
           <div class="prompt-pills" id="promptPills" aria-label="Prompt fragment chips"></div>
-          <div class="composer-row">
-            <div class="seg" id="aspectSeg" role="radiogroup" aria-label="Format">
-              <button type="button" class="on" data-v="3:4">Portrait</button>
-              <button type="button" data-v="1:1">Square</button>
-              <button type="button" data-v="9:16">Story</button>
-            </div>
-            <div class="composer-actions">
-              <button type="button" class="btn btn-light" id="generateImageBtn">Generate image</button>
-              <button type="button" class="btn btn-ghost" id="storyboardBtn" title="Expand scene into 4–6 angle variants">Photo set (4–6)</button>
-              <button type="button" class="btn btn-ghost" id="moviePackBtn" title="Build a 6-scene movie checklist">Movie pack (6 scenes)</button>
-              <button type="button" class="btn btn-ghost" id="copyFullPromptBtn">Copy full prompt</button>
+          </div><!-- /genSceneSection -->
+
+          <div class="hub-section" id="genModeSection">
+            <h3 class="hub-section-title">Mode</h3>
+            <div class="composer-row composer-row-mode">
+              <div class="seg" id="modeSeg" role="radiogroup" aria-label="Content mode">
+                <button type="button" class="on" data-v="soft">Soft</button>
+                <button type="button" data-v="suggestive">Suggestive</button>
+                <button type="button" data-v="nsfw">NSFW</button>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm use-horde-btn" id="useHordeBtn" hidden>Switch to AI Horde</button>
             </div>
           </div>
-          <div class="horde-queue-meter" id="hordeQueueMeter" hidden aria-live="polite"></div>
-          <p class="hint storyboard-hint" id="storyboardProgress" hidden></p>
-          <details class="gen-steal-group" id="moviePackGroup">
-            <summary>Movie pack</summary>
-            <div class="gen-steal-body">
-              <div class="movie-pack-panel" id="moviePackList"></div>
+
+          <div class="hub-section" id="genProviderSection">
+            <h3 class="hub-section-title">Provider <em>Main image</em></h3>
+            <p class="gen-api-note" id="genProviderNote">AI Horde (free) — reliable in browser.</p>
+            <div class="provider-card-grid gen-provider-cards" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
+              <button type="button" class="provider-card" id="btnProviderFlux" data-provider="flux" data-v="flux">
+                <span class="provider-card-name">Flux</span>
+                <span class="provider-card-blurb">NIM · needs key + CORS proxy</span>
+              </button>
+              <button type="button" class="provider-card on" id="btnProviderHorde" data-provider="horde" data-v="horde">
+                <span class="provider-card-name">Horde</span>
+                <span class="provider-card-blurb">Free · reliable in browser</span>
+                <span class="provider-main-badge">Main</span>
+              </button>
+              <button type="button" class="provider-card" id="btnProviderPollinations" data-provider="pollinations" data-v="pollinations">
+                <span class="provider-card-name">Pollinations</span>
+                <span class="provider-card-blurb">Free fallback</span>
+              </button>
             </div>
-          </details>
-          <div class="storyboard-grid" id="storyboardGrid" hidden></div>
-          <div class="composer-row composer-row-mode">
-            <div class="seg" id="modeSeg" role="radiogroup" aria-label="Content mode">
-              <button type="button" class="on" data-v="soft">Soft</button>
-              <button type="button" data-v="suggestive">Suggestive</button>
-              <button type="button" data-v="nsfw">NSFW</button>
+            <div class="seg gen-flux-model-seg" id="genFluxModelSeg" hidden role="radiogroup" aria-label="Flux model">
+              <button type="button" data-v="schnell" class="on">Schnell</button>
+              <button type="button" data-v="kontext">Kontext</button>
             </div>
-            <button type="button" class="btn btn-ghost btn-sm use-horde-btn" id="useHordeBtn" hidden>Switch to AI Horde</button>
+            <p class="hint" id="genFluxHint" hidden>Schnell = new image · Kontext = edit last image · needs NVIDIA key + CORS proxy in Agent → Providers (else Horde fallback)</p>
           </div>
-          <p class="gen-api-note" id="genProviderNote">AI Horde (free) — reliable in browser.</p>
-          <div class="seg gen-provider-seg" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
-            <button type="button" id="btnProviderFlux" data-provider="flux" data-v="flux">Flux</button>
-            <button type="button" id="btnProviderHorde" class="on" data-provider="horde" data-v="horde">Horde</button>
-            <button type="button" id="btnProviderPollinations" data-provider="pollinations" data-v="pollinations">Pollinations</button>
+
+          <div class="hub-section" id="genAspectSection">
+            <h3 class="hub-section-title">Aspect &amp; Generate</h3>
+            <div class="composer-row">
+              <div class="seg" id="aspectSeg" role="radiogroup" aria-label="Format">
+                <button type="button" class="on" data-v="3:4">Portrait</button>
+                <button type="button" data-v="1:1">Square</button>
+                <button type="button" data-v="9:16">Story</button>
+              </div>
+              <div class="composer-actions">
+                <button type="button" class="btn btn-light" id="generateImageBtn">Generate image</button>
+                <button type="button" class="btn btn-ghost" id="storyboardBtn" title="Expand scene into 4–6 angle variants">Photo set (4–6)</button>
+                <button type="button" class="btn btn-ghost" id="moviePackBtn" title="Build a 6-scene movie checklist">Movie pack (6 scenes)</button>
+                <button type="button" class="btn btn-ghost" id="copyFullPromptBtn">Copy full prompt</button>
+              </div>
+            </div>
+            <div class="horde-queue-meter" id="hordeQueueMeter" hidden aria-live="polite"></div>
+            <p class="hint storyboard-hint" id="storyboardProgress" hidden></p>
+            <details class="gen-steal-group" id="moviePackGroup">
+              <summary>Movie pack</summary>
+              <div class="gen-steal-body">
+                <div class="movie-pack-panel" id="moviePackList"></div>
+              </div>
+            </details>
+            <div class="storyboard-grid" id="storyboardGrid" hidden></div>
           </div>
-          <div class="seg gen-flux-model-seg" id="genFluxModelSeg" hidden role="radiogroup" aria-label="Flux model">
-            <button type="button" data-v="schnell" class="on">Schnell</button>
-            <button type="button" data-v="kontext">Kontext</button>
-          </div>
-          <p class="hint" id="genFluxHint" hidden>Schnell = new image · Kontext = edit last image · needs NVIDIA key + CORS proxy in Agent → Engines (else Horde fallback)</p>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
@@ -522,8 +548,8 @@
       <!-- Captions -->
       <div class="ws-panel" id="panel-captions" role="tabpanel">
         <div class="panel-head">
-          <h2 class="h3">Captions</h2>
-          <p class="hint">Soft, cute, a little shy &amp; flirty — drafts in their voice. No API.</p>
+          <h2 class="h3">Scripts</h2>
+          <p class="hint">Soft, cute, a little shy &amp; flirty — caption &amp; script drafts in their voice. No API.</p>
         </div>
         <div class="card">
           <div class="grid-2">
@@ -605,11 +631,11 @@
         <div class="media-grid" id="mediaGrid"></div>
       </div>
 
-      <!-- Agent -->
+      <!-- Agent · Chat -->
       <div class="ws-panel" id="panel-agent" role="tabpanel">
         <div class="panel-head">
-          <h2 class="h3">Agent</h2>
-          <p class="hint">Studio co-pilot or in-character Lila chat. Agent owns Image + Video engines below. Free only — data stays in this browser.</p>
+          <h2 class="h3">Chat</h2>
+          <p class="hint">Studio co-pilot or in-character Lila. Pick chat engines &amp; keys in <strong>Providers</strong>. Free only — data stays in this browser.</p>
         </div>
         <div class="seg agent-mode-seg" id="agentModeSeg" role="radiogroup" aria-label="Agent mode">
           <button type="button" class="on" data-v="studio">Studio</button>
@@ -668,20 +694,91 @@
               </div>
             </div>
           </details>
-          <p class="hint agent-gen-hint">Edit / animate last still · Engines below. Free only.</p>
+          <p class="hint agent-gen-hint">Edit / animate last still · Providers tab for keys &amp; engines. Free only.</p>
         </div>
-        <details class="agent-engines-box" id="agentEnginesDetails" open>
-          <summary>Engines</summary>
-          <div id="agentEnginesList" class="agent-engines-list"></div>
-        </details>
-        <details class="agent-skills-box" id="agentSkillsDetails">
-          <summary>Skills</summary>
-          <div class="toolbar" style="margin-top:10px">
+      </div>
+
+      <!-- Agent · Skills -->
+      <div class="ws-panel" id="panel-skills" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Skills</h2>
+          <p class="hint">Taught behaviors for Studio / Lila chat. Toggle or add your own — stored in this browser only.</p>
+        </div>
+        <div class="hub-section">
+          <div class="toolbar" style="margin-top:0">
             <button type="button" class="btn btn-light btn-sm" id="btn-add-skill">+ Add skill</button>
           </div>
           <div id="agentSkillsList" class="card-list"></div>
-        </details>
-        <p class="gen-api-note">Chat: free Groq (key in Engines) or Pollinations. Images: Horde + Pollinations. Data stays in this browser.</p>
+        </div>
+      </div>
+
+      <!-- Agent · Providers -->
+      <div class="ws-panel" id="panel-providers" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Providers</h2>
+          <p class="hint">Pick Main image &amp; chat engines, paste API keys, and review engine status. Keys stay in <code>localStorage</code> only — never committed.</p>
+        </div>
+
+        <div class="hub-section" id="provImageSection">
+          <h3 class="hub-section-title">Main image provider</h3>
+          <p class="hint">Sets Generate default (<code>genProvider</code>). Same pick as Create → Generate.</p>
+          <div class="provider-card-grid" id="provImageCards" role="radiogroup" aria-label="Main image provider">
+            <button type="button" class="provider-card" data-provider="flux" data-v="flux">
+              <span class="provider-card-name">Flux</span>
+              <span class="provider-card-blurb">NVIDIA NIM · Schnell / Kontext</span>
+            </button>
+            <button type="button" class="provider-card on" data-provider="horde" data-v="horde">
+              <span class="provider-card-name">Horde</span>
+              <span class="provider-card-blurb">AI Horde · free &amp; reliable</span>
+              <span class="provider-main-badge">Main</span>
+            </button>
+            <button type="button" class="provider-card" data-provider="pollinations" data-v="pollinations">
+              <span class="provider-card-name">Pollinations</span>
+              <span class="provider-card-blurb">Free public fallback</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="hub-section" id="provChatSection">
+          <h3 class="hub-section-title">Main chat engine</h3>
+          <p class="hint">Agent Send preference. Dolphin uses OpenRouter; Lightning / Kimi / Ultra need NVIDIA + CORS proxy.</p>
+          <div class="provider-card-grid" id="provChatCards" role="radiogroup" aria-label="Main chat engine">
+            <button type="button" class="provider-card" data-chat="lightning" data-v="lightning">
+              <span class="provider-card-name">Lightning</span>
+              <span class="provider-card-blurb">NIM · fast Soft / Suggestive</span>
+            </button>
+            <button type="button" class="provider-card on" data-chat="kimi" data-v="kimi">
+              <span class="provider-card-name">Kimi</span>
+              <span class="provider-card-blurb">NIM · balanced default</span>
+              <span class="provider-main-badge">Main</span>
+            </button>
+            <button type="button" class="provider-card" data-chat="ultra" data-v="ultra">
+              <span class="provider-card-name">Ultra</span>
+              <span class="provider-card-blurb">NIM · deep reasoning</span>
+            </button>
+            <button type="button" class="provider-card" data-chat="lexi" data-v="lexi">
+              <span class="provider-card-name">Dolphin</span>
+              <span class="provider-card-blurb">OpenRouter · uncensored</span>
+            </button>
+          </div>
+          <div class="provider-card-grid provider-card-grid--secondary" id="provChatFallbackCards" aria-label="Chat fallbacks">
+            <div class="provider-card provider-card--info" data-fallback="groq">
+              <span class="provider-card-name">Groq</span>
+              <span class="provider-card-blurb">Free text fallback when NIM unavailable</span>
+            </div>
+            <div class="provider-card provider-card--info" data-fallback="pollinations">
+              <span class="provider-card-name">Pollinations</span>
+              <span class="provider-card-blurb">Last-resort chat fallback</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hub-section" id="provKeysSection">
+          <h3 class="hub-section-title">Keys, proxy &amp; engines</h3>
+          <div id="agentEnginesDetails" class="agent-engines-box providers-engines-box">
+            <div id="agentEnginesList" class="agent-engines-list"></div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -766,6 +863,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js?v=20260928h"></script>
+<script type="module" src="./js/app.js?v=20260928i"></script>
 </body>
 </html>

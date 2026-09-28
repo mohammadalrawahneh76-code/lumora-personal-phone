@@ -207,7 +207,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Groq Agent chat",
     description: "Free Groq key for Agent text; images stay Horde/Pollinations",
     body:
-      "Agent text chat prefers free Groq (OpenAI-compatible) when the user pastes a key from console.groq.com/keys into Agent → Engines. Key stays in this browser only. If no Groq key, Agent falls back to free Pollinations text. Images NEVER use Groq or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine. Spell it Groq (inference) not Grok (xAI).",
+      "Agent text chat prefers free Groq (OpenAI-compatible) when the user pastes a key from console.groq.com/keys into Agent → Providers. Key stays in this browser only. If no Groq key, Agent falls back to free Pollinations text. Images NEVER use Groq or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine. Spell it Groq (inference) not Grok (xAI).",
     enabled: true,
     modes: ["studio", "both"],
   },

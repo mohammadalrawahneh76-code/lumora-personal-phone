@@ -732,6 +732,8 @@ function saveAgentVideoPendingToMedia(c, label, notes, aspect, mode, extra) {
 function renderAgentEnginesPanel() {
   const el = $("#agentEnginesList");
   if (!el) return;
+  if (typeof syncProviderCards === "function") syncProviderCards();
+  if (typeof syncChatEngineCards === "function") syncChatEngineCards();
   const items = [
     AgentEngines.image,
     AgentEngines.video,
@@ -836,7 +838,7 @@ function renderAgentEnginesPanel() {
     : '<a href="https://build.nvidia.com/models" target="_blank" rel="noopener">build.nvidia.com/models</a>';
   const nvidiaRow =
     '<div class="agent-engine-row agent-nvidia-key-row">' +
-    '<span class="agent-engine-name">Agent chat models</span>' +
+    '<span class="agent-engine-name">Chat model (seg)</span>' +
     '<span class="agent-engine-badge ' +
     nvidiaBadge +
     '">' +
@@ -885,17 +887,33 @@ function renderAgentEnginesPanel() {
     "</label></div>";
   const keyRow =
     '<div class="agent-engine-row agent-horde-key-row">' +
-    '<span class="agent-engine-name">Horde key</span>' +
+    '<span class="agent-engine-name">AI Horde</span>' +
     '<span class="agent-engine-badge ' +
     keyBadge +
     '">' +
     keyLabel +
     "</span>" +
     '<span class="agent-engine-detail">' +
-    "Set free Horde key in Generate → Advanced · " +
+    (keySaved
+      ? "Horde key saved — faster queues, still $0"
+      : "Anonymous OK · free key speeds queues") +
+    " · " +
     '<a href="https://stablehorde.net/register" target="_blank" rel="noopener">Register (still $0)</a>' +
-    "</span></div>";
-  el.innerHTML = rows + styleRow + nvidiaRow + groqRow + keyRow;
+    "</span>" +
+    '<label class="field agent-horde-key-field">' +
+    '<span class="label">AI Horde API key <em>optional · still $0</em></span>' +
+    '<input type="password" id="agentHordeKey" maxlength="64" placeholder="Leave blank for anonymous" autocomplete="off" />' +
+    '<span class="hint">Same key as Generate → Advanced. From <a href="https://stablehorde.net/register" target="_blank" rel="noopener">stablehorde.net/register</a>.</span>' +
+    "</label></div>";
+  el.innerHTML =
+    '<div class="hub-section providers-engines-status"><h3 class="hub-section-title">Engine status</h3>' +
+    rows +
+    styleRow +
+    '</div><div class="hub-section providers-keys"><h3 class="hub-section-title">API keys &amp; proxy</h3>' +
+    nvidiaRow +
+    groqRow +
+    keyRow +
+    "</div>";
   const nvidiaInput = $("#agentNvidiaKey");
   if (nvidiaInput) {
     const storedNv = load(KEYS.nvidiaKey, "") || "";
