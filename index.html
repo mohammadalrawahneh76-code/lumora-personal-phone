@@ -248,6 +248,7 @@
         <button type="button" class="ws-tab" role="tab" data-tab="calendar">Calendar</button>
         <button type="button" class="ws-tab" role="tab" data-tab="checklist">Checklist</button>
         <button type="button" class="ws-tab" role="tab" data-tab="media">Media library</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="agent">Agent</button>
       </nav>
 
       <!-- Bible -->
@@ -458,6 +459,34 @@
         </div>
         <div class="media-grid" id="mediaGrid"></div>
       </div>
+
+      <!-- Agent -->
+      <div class="ws-panel" id="panel-agent" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Agent</h2>
+          <p class="hint">Studio co-pilot or in-character Lila chat. Teach skills below. Free only — data stays in this browser.</p>
+        </div>
+        <div class="seg agent-mode-seg" id="agentModeSeg" role="radiogroup" aria-label="Agent mode">
+          <button type="button" class="on" data-v="studio">Studio</button>
+          <button type="button" data-v="lila">Lila</button>
+        </div>
+        <div class="agent-chat" id="agentChat" aria-live="polite"></div>
+        <div class="agent-composer">
+          <textarea id="agentInput" rows="2" maxlength="2000" placeholder="Ask the agent…" enterkeyhint="send"></textarea>
+          <div class="composer-row">
+            <button type="button" class="btn btn-light" id="agentSendBtn">Send</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="agentClearBtn">Clear chat</button>
+          </div>
+        </div>
+        <details class="agent-skills-box" id="agentSkillsDetails">
+          <summary>Skills</summary>
+          <div class="toolbar" style="margin-top:10px">
+            <button type="button" class="btn btn-light btn-sm" id="btn-add-skill">+ Add skill</button>
+          </div>
+          <div id="agentSkillsList" class="card-list"></div>
+        </details>
+        <p class="gen-api-note">Free Pollinations text brain; skills teach the agent; data stays in this browser. No paid APIs or credits.</p>
+      </div>
     </div>
   </section>
 </main>
@@ -500,6 +529,28 @@
     <div class="modal-actions">
       <button type="submit" class="btn btn-light" value="save">Save</button>
       <button type="button" class="btn btn-ghost" id="media-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+
+<!-- Skill dialog -->
+<dialog id="skill-dialog" class="modal-dlg">
+  <form method="dialog" id="skill-form" class="modal-body">
+    <h3 id="skill-dialog-title">Edit skill</h3>
+    <label class="field"><span class="label">Name</span><input type="text" id="skill-name" required maxlength="80" /></label>
+    <label class="field"><span class="label">Short description</span><input type="text" id="skill-desc" maxlength="160" placeholder="What this skill teaches" /></label>
+    <label class="field"><span class="label">Body</span><textarea id="skill-body" rows="6" required placeholder="Instructions the agent should follow…"></textarea></label>
+    <label class="field"><span class="label">Mode</span>
+      <select id="skill-modes">
+        <option value="both">Both (Studio + Lila)</option>
+        <option value="studio">Studio only</option>
+        <option value="lila">Lila only</option>
+      </select>
+    </label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-light" value="save">Save</button>
+      <button type="button" class="btn btn-ghost" id="skill-cancel">Cancel</button>
     </div>
   </form>
 </dialog>

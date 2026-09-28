@@ -13,6 +13,10 @@
     hordeKey: PREFIX + "horde_key",
     xaiKey: PREFIX + "xai_key",
     genProvider: PREFIX + "gen_provider",
+    agentSkills: PREFIX + "agent_skills",
+    agentChatStudio: PREFIX + "agent_chat_studio",
+    agentChatLila: PREFIX + "agent_chat_lila",
+    agentMode: PREFIX + "agent_mode",
   };
 
   const $ = (s, el = document) => el.querySelector(s);
@@ -26,10 +30,12 @@
     currentId: null,
     viewing: null,
     editingPromptId: null,
+    editingSkillId: null,
     objectUrls: [], // revoke on navigate
     lastGenUrl: null,
     genLoading: false,
     grokNsfwWarned: false,
+    agentLoading: false,
   };
 
   // ——— Starter: Lila Bloom ———
@@ -446,6 +452,11 @@
   function setTab(tabId) {
     $$(".ws-tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === tabId));
     $$(".ws-panel").forEach((p) => p.classList.toggle("on", p.id === "panel-" + tabId));
+    if (tabId === "agent") {
+      renderAgentChat();
+      renderAgentSkills();
+      syncAgentModeSeg();
+    }
   }
 
   function current() {
@@ -1566,13 +1577,497 @@
       esc(buildFullPrompt(c, scene));
   }
 
+
+  // ——— Agent (Studio / Lila) ———
+  const AGENT_CHAT_CAP = 40;
+  const POLLINATIONS_CHAT = "https://text.pollinations.ai/openai";
+  const POLLINATIONS_GET = "https://text.pollinations.ai/";
+
+  const STARTER_AGENT_SKILLS = [
+    {
+      id: "studio-image-quality",
+      name: "Image quality (free)",
+      description: "Prefer Horde for photoreal; Soft/Suggestive first; wait & regenerate",
+      body:
+        "Prefer AI Horde for photoreal NSFW or when Pollinations looks doll-like. Soft/Suggestive first. Pollinations is free but often doll-like. Wait 1–3 min for Horde. Regenerate broken anatomy. Free only — never suggest paid Grok credits or any paid API. Skip paid Grok Imagine unless the user already chose it knowing it costs credits.",
+      enabled: true,
+      modes: ["studio"],
+    },
+    {
+      id: "studio-prompt-craft",
+      name: "Prompt craft",
+      description: "Short scene prompts + identity lock; Soft/Suggestive/NSFW",
+      body:
+        "Help write short scene prompts. Always remind to keep the identity lock / master appearance consistent. Guide Soft vs Suggestive vs NSFW for fictional adults 21+. Keep prompts concrete: pose, outfit, lighting, mood. Do not invent paid tools or paid credits steps.",
+      enabled: true,
+      modes: ["studio"],
+    },
+    {
+      id: "studio-captions",
+      name: "Captions in voice",
+      description: "Write captions from bible speakingStyle",
+      body:
+        "When asked for captions, write in the character's voice using their speakingStyle from the bible. Keep captions short, post-ready, and match Soft / Suggestive / NSFW tone as asked. Prefer the current character's personality and fillers.",
+      enabled: true,
+      modes: ["studio"],
+    },
+    {
+      id: "lila-voice",
+      name: "Lila voice",
+      description: "Stay in shy sweet Lila Bloom voice",
+      body:
+        "Stay in Lila Bloom voice: shy, sweet, mm…/hehe, flirty never crude. Fictional adult 22. When in Lila mode, use the current character's name, personality, speakingStyle, and a short masterAppearance snippet. Soft consensual flirt and soft NSFW when asked; never crude slang.",
+      enabled: true,
+      modes: ["lila"],
+    },
+    {
+      id: "boundaries",
+      name: "Boundaries",
+      description: "Adult fictional 21+ only; refuse minors",
+      body:
+        "Adult fictional characters 21+ only. Refuse any content involving minors or anyone under 21. Consensual soft NSFW is OK when asked. No non-consensual, extreme illegal, or real-person impersonation.",
+      enabled: true,
+      modes: ["both"],
+    },
+  ];
+
+  function getAgentMode() {
+    const m = load(KEYS.agentMode, "studio");
+    return m === "lila" ? "lila" : "studio";
+  }
+  function setAgentMode(mode) {
+    const m = mode === "lila" ? "lila" : "studio";
+    save(KEYS.agentMode, m);
+    return m;
+  }
+  function agentChatKey(mode) {
+    return mode === "lila" ? KEYS.agentChatLila : KEYS.agentChatStudio;
+  }
+  function getAgentChat(mode) {
+    const list = load(agentChatKey(mode), []);
+    return Array.isArray(list) ? list : [];
+  }
+  function setAgentChat(mode, messages) {
+    const capped = (messages || []).slice(-AGENT_CHAT_CAP);
+    save(agentChatKey(mode), capped);
+    return capped;
+  }
+  function clearAgentChat(mode) {
+    save(agentChatKey(mode), []);
+  }
+
+  function normalizeSkill(s) {
+    if (!s || typeof s !== "object") return null;
+    let modes = Array.isArray(s.modes) ? s.modes.map(String) : ["both"];
+    if (!modes.length) modes = ["both"];
+    return {
+      id: String(s.id || uid("skill")),
+      name: String(s.name || "Untitled").slice(0, 80),
+      description: String(s.description || "").slice(0, 200),
+      body: String(s.body || ""),
+      enabled: s.enabled !== false,
+      modes: modes,
+    };
+  }
+
+  function getAgentSkills() {
+    const raw = load(KEYS.agentSkills, null);
+    if (!Array.isArray(raw) || !raw.length) return null;
+    return raw.map(normalizeSkill).filter(Boolean);
+  }
+  function setAgentSkills(list) {
+    save(KEYS.agentSkills, (list || []).map(normalizeSkill).filter(Boolean));
+  }
+  function ensureAgentSkills() {
+    if (getAgentSkills()) return;
+    setAgentSkills(STARTER_AGENT_SKILLS.map((s) => ({ ...s })));
+  }
+  function skillApplies(skill, mode) {
+    if (!skill || skill.enabled === false) return false;
+    const modes = skill.modes || [];
+    return modes.includes("both") || modes.includes(mode);
+  }
+  function enabledSkillsForMode(mode) {
+    ensureAgentSkills();
+    return (getAgentSkills() || []).filter((s) => skillApplies(s, mode));
+  }
+
+  function buildSkillsBlock(mode) {
+    const skills = enabledSkillsForMode(mode);
+    if (!skills.length) return "";
+    return (
+      "Taught skills (follow these):\n" +
+      skills
+        .map((s, i) => (i + 1) + ". " + s.name + ": " + (s.body || s.description || ""))
+        .join("\n")
+    );
+  }
+
+  function buildStudioSystem(c) {
+    const name = (c && c.name) || "the character";
+    return (
+      "You are Lumora Personal's free studio co-pilot on a phone web app. " +
+      "Help with character bible, prompt craft, Soft/Suggestive/NSFW scene generation, " +
+      "AI Horde vs Pollinations (both free), captions, and calendar ideas. " +
+      "Never invent paid steps or ask the user to buy credits. Skip paid Grok unless they already use it. " +
+      "Be concise for mobile. Current character: " +
+      name +
+      ". Adult fictional 21+ only."
+    );
+  }
+
+  function buildLilaSystem(c) {
+    const char = c || {};
+    const name = char.name || "Lila Bloom";
+    const age = char.age || 22;
+    const personality = (char.personality || "").slice(0, 500);
+    const speaking = (char.speakingStyle || "").slice(0, 400);
+    let master = String(char.masterAppearance || "").trim();
+    if (master.length > 500) master = master.slice(0, 500) + "…";
+    return (
+      "You are roleplaying as " +
+      name +
+      ", a fictional adult (age " +
+      age +
+      "). Stay fully in character. " +
+      "Personality: " +
+      personality +
+      " Speaking style: " +
+      speaking +
+      " Appearance snippet: " +
+      master +
+      " Soft, shy, sweet, flirty never crude. Consensual soft NSFW OK when asked. Adult 21+ only; refuse minors."
+    );
+  }
+
+  function buildAgentMessages(mode, userText, c) {
+    const system =
+      (mode === "lila" ? buildLilaSystem(c) : buildStudioSystem(c)) +
+      "\n\n" +
+      buildSkillsBlock(mode);
+    const history = getAgentChat(mode)
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
+      .slice(-24)
+      .map((m) => ({ role: m.role, content: String(m.content) }));
+    return [{ role: "system", content: system }, ...history, { role: "user", content: userText }];
+  }
+
+  async function callPollinationsChat(messages) {
+    const res = await fetch(POLLINATIONS_CHAT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "openai", messages: messages, private: true }),
+    });
+    if (!res.ok) throw new Error("Pollinations POST " + res.status);
+    const data = await res.json();
+    const text =
+      (data &&
+        data.choices &&
+        data.choices[0] &&
+        data.choices[0].message &&
+        data.choices[0].message.content) ||
+      data.response ||
+      data.text ||
+      "";
+    if (!String(text).trim()) throw new Error("Empty reply");
+    return String(text).trim();
+  }
+
+  async function callPollinationsGet(messages) {
+    const compact = messages
+      .map((m) => (m.role || "user").toUpperCase() + ": " + String(m.content || ""))
+      .join("\n\n")
+      .slice(0, 3500);
+    const url = POLLINATIONS_GET + encodeURIComponent(compact);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Pollinations GET " + res.status);
+    const text = await res.text();
+    if (!String(text).trim()) throw new Error("Empty reply");
+    return String(text).trim();
+  }
+
+  async function agentAsk(userText) {
+    const mode = getAgentMode();
+    const c = current();
+    const messages = buildAgentMessages(mode, userText, c);
+    try {
+      return await callPollinationsChat(messages);
+    } catch (err) {
+      try {
+        return await callPollinationsGet(messages);
+      } catch (err2) {
+        throw new Error((err2 && err2.message) || (err && err.message) || "Agent request failed");
+      }
+    }
+  }
+
+  function syncAgentModeSeg() {
+    const mode = getAgentMode();
+    $$("#agentModeSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === mode));
+    const input = $("#agentInput");
+    if (input) {
+      input.placeholder =
+        mode === "lila" ? "Message Lila…" : "Ask the studio agent…";
+    }
+  }
+
+  function renderAgentChat() {
+    const box = $("#agentChat");
+    if (!box) return;
+    const mode = getAgentMode();
+    const msgs = getAgentChat(mode);
+    if (!msgs.length && !state.agentLoading) {
+      box.innerHTML =
+        '<div class="agent-empty">' +
+        (mode === "lila"
+          ? "Say hi — Lila will reply in character (free text)."
+          : "Ask for prompt help, captions, or generation tips.") +
+        "</div>";
+      return;
+    }
+    let html = msgs
+      .map((m) => {
+        const role = m.role === "user" ? "user" : "assistant";
+        return (
+          '<div class="agent-bubble ' +
+          role +
+          '">' +
+          esc(m.content) +
+          (m.ts
+            ? '<span class="agent-meta">' + esc(new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + "</span>"
+            : "") +
+          "</div>"
+        );
+      })
+      .join("");
+    if (state.agentLoading) {
+      html += '<div class="agent-bubble assistant typing">Thinking…</div>';
+    }
+    box.innerHTML = html;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function modesLabel(modes) {
+    const m = modes || [];
+    if (m.includes("both") || (m.includes("studio") && m.includes("lila"))) return "both";
+    if (m.includes("lila")) return "lila";
+    return "studio";
+  }
+
+  function renderAgentSkills() {
+    const listEl = $("#agentSkillsList");
+    if (!listEl) return;
+    ensureAgentSkills();
+    const skills = getAgentSkills() || [];
+    if (!skills.length) {
+      listEl.innerHTML = '<p class="empty-inline">No skills yet. Add one.</p>';
+      return;
+    }
+    listEl.innerHTML = skills
+      .map((s) => {
+        return (
+          '<div class="agent-skill-card" data-id="' +
+          esc(s.id) +
+          '">' +
+          '<div class="agent-skill-top">' +
+          "<label>" +
+          '<input type="checkbox" data-act="toggle"' +
+          (s.enabled ? " checked" : "") +
+          " />" +
+          "<span><span class=\"agent-skill-name\">" +
+          esc(s.name) +
+          '</span><span class="agent-skill-mode">' +
+          esc(modesLabel(s.modes)) +
+          "</span>" +
+          '<p class="agent-skill-desc">' +
+          esc(s.description || "") +
+          "</p></span></label>" +
+          "</div>" +
+          '<div class="agent-skill-actions">' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-act="edit">Edit</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-act="delete">Delete</button>' +
+          "</div></div>"
+        );
+      })
+      .join("");
+  }
+
+  function openSkillDialog(skill) {
+    state.editingSkillId = skill ? skill.id : null;
+    $("#skill-dialog-title").textContent = skill ? "Edit skill" : "Add skill";
+    $("#skill-name").value = skill ? skill.name : "";
+    $("#skill-desc").value = skill ? skill.description || "" : "";
+    $("#skill-body").value = skill ? skill.body || "" : "";
+    $("#skill-modes").value = skill ? modesLabel(skill.modes) : "both";
+    const dlg = $("#skill-dialog");
+    if (dlg.showModal) dlg.showModal();
+    else dlg.setAttribute("open", "");
+  }
+
+  async function sendAgentMessage() {
+    if (state.agentLoading) return;
+    const input = $("#agentInput");
+    const text = (input && input.value || "").trim();
+    if (!text) return;
+    const mode = getAgentMode();
+    const history = getAgentChat(mode);
+    history.push({ role: "user", content: text, ts: Date.now() });
+    setAgentChat(mode, history);
+    if (input) input.value = "";
+    state.agentLoading = true;
+    renderAgentChat();
+    try {
+      const reply = await agentAsk(text);
+      const next = getAgentChat(mode);
+      next.push({ role: "assistant", content: reply, ts: Date.now() });
+      setAgentChat(mode, next);
+    } catch (err) {
+      toast((err && err.message) || "Agent failed — try again");
+    } finally {
+      state.agentLoading = false;
+      renderAgentChat();
+    }
+  }
+
+  function wireAgent() {
+    ensureAgentSkills();
+    const modeSeg = $("#agentModeSeg");
+    if (modeSeg) {
+      modeSeg.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-v]");
+        if (!btn) return;
+        setAgentMode(btn.dataset.v);
+        syncAgentModeSeg();
+        renderAgentChat();
+        renderAgentSkills();
+      });
+    }
+    const sendBtn = $("#agentSendBtn");
+    if (sendBtn) sendBtn.addEventListener("click", () => sendAgentMessage());
+    const input = $("#agentInput");
+    if (input) {
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+          // desktop: Enter sends; on narrow phones allow newline via soft keyboard without force
+          const narrow = window.matchMedia && window.matchMedia("(max-width: 520px)").matches;
+          if (!narrow) {
+            e.preventDefault();
+            sendAgentMessage();
+          }
+        }
+      });
+    }
+    const clearBtn = $("#agentClearBtn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        const mode = getAgentMode();
+        if (!confirm("Clear " + mode + " chat?")) return;
+        clearAgentChat(mode);
+        renderAgentChat();
+        toast("Chat cleared");
+      });
+    }
+    const addSkill = $("#btn-add-skill");
+    if (addSkill) addSkill.addEventListener("click", () => openSkillDialog(null));
+    const cancel = $("#skill-cancel");
+    if (cancel) {
+      cancel.addEventListener("click", () => {
+        const dlg = $("#skill-dialog");
+        if (dlg.close) dlg.close();
+        else dlg.removeAttribute("open");
+      });
+    }
+    const form = $("#skill-form");
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = $("#skill-name").value.trim();
+        const description = $("#skill-desc").value.trim();
+        const body = $("#skill-body").value.trim();
+        const modeVal = $("#skill-modes").value || "both";
+        if (!name || !body) return;
+        ensureAgentSkills();
+        let skills = getAgentSkills() || [];
+        if (state.editingSkillId) {
+          skills = skills.map((s) =>
+            s.id === state.editingSkillId
+              ? { ...s, name, description, body, modes: [modeVal] }
+              : s
+          );
+        } else {
+          skills.push({
+            id: uid("skill"),
+            name,
+            description,
+            body,
+            enabled: true,
+            modes: [modeVal],
+          });
+        }
+        setAgentSkills(skills);
+        const dlg = $("#skill-dialog");
+        if (dlg.close) dlg.close();
+        else dlg.removeAttribute("open");
+        renderAgentSkills();
+        toast(state.editingSkillId ? "Skill updated" : "Skill added");
+        state.editingSkillId = null;
+      });
+    }
+    const listEl = $("#agentSkillsList");
+    if (listEl) {
+      listEl.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-act]");
+        if (!btn) return;
+        const card = btn.closest("[data-id]");
+        if (!card) return;
+        const id = card.dataset.id;
+        ensureAgentSkills();
+        let skills = getAgentSkills() || [];
+        const skill = skills.find((s) => s.id === id);
+        if (!skill) return;
+        const act = btn.dataset.act;
+        if (act === "toggle") {
+          const checked = btn.checked;
+          skills = skills.map((s) => (s.id === id ? { ...s, enabled: !!checked } : s));
+          setAgentSkills(skills);
+          return;
+        }
+        if (act === "edit") {
+          openSkillDialog(skill);
+          return;
+        }
+        if (act === "delete") {
+          if (!confirm('Delete skill "' + skill.name + '"?')) return;
+          setAgentSkills(skills.filter((s) => s.id !== id));
+          renderAgentSkills();
+          toast("Skill deleted");
+        }
+      });
+      listEl.addEventListener("change", (e) => {
+        const cb = e.target.closest('input[data-act="toggle"]');
+        if (!cb) return;
+        const card = cb.closest("[data-id]");
+        if (!card) return;
+        ensureAgentSkills();
+        let skills = getAgentSkills() || [];
+        skills = skills.map((s) =>
+          s.id === card.dataset.id ? { ...s, enabled: !!cb.checked } : s
+        );
+        setAgentSkills(skills);
+      });
+    }
+  }
+
+
   // ——— Export / Import ———
   function doExport() {
+    ensureAgentSkills();
     const payload = {
       _app: "lumora-personal",
       _version: 1,
       exportedAt: new Date().toISOString(),
       characters: getCharacters(),
+      agentSkills: getAgentSkills() || [],
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -1611,6 +2106,9 @@
         } else {
           toast("Import failed — unrecognized format");
           return;
+        }
+        if (Array.isArray(data.agentSkills) && data.agentSkills.length) {
+          setAgentSkills(data.agentSkills);
         }
         toast("Import complete");
         if (curPath() === "/app") renderDashboard();
