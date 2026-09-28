@@ -790,6 +790,35 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 .agent-groq-key-field input {
   width: 100%;
 }
+
+.agent-bm-box {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.agent-bm-box .field {
+  gap: 4px;
+  margin: 0;
+}
+.agent-bm-box .label {
+  font-size: 0.72rem;
+}
+.agent-bm-box input {
+  width: 100%;
+}
+.agent-bm-box .hint {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+.agent-bm-box .hint code {
+  font-size: 0.68rem;
+}
+
 .agent-horde-key-row .agent-engine-detail a,
 .agent-groq-key-row .agent-engine-detail a {
   color: var(--accent, #a78bfa);

@@ -12,6 +12,8 @@ export const KEYS = {
   nvidiaProxy: PREFIX + "nvidia_proxy",
   featherlessKey: PREFIX + "featherless_key",
   openrouterKey: PREFIX + "openrouter_key",
+  bluesmindsKey: PREFIX + "bluesminds_key",
+  bluesmindsModel: PREFIX + "bluesminds_model",
   genProvider: PREFIX + "gen_provider",
   fluxModel: PREFIX + "flux_model",
   agentSkills: PREFIX + "agent_skills",

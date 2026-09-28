@@ -203,11 +203,11 @@ export const STEAL_LIST_AGENT_SKILLS = [
 
 export const GROK_NSFW_AGENT_SKILLS = [
   {
-    id: "groq-agent-chat",
-    name: "Groq Agent chat",
-    description: "Free Groq key for Agent text; images stay Horde/Pollinations",
+    id: "bluesminds-agent-chat",
+    name: "BluesMinds Agent chat",
+    description: "BluesMinds key for Agent text; images stay Horde/Pollinations",
     body:
-      "Agent text chat quietly uses free Groq when a key is already in this browser, else free Pollinations text. Do not ask the user to paste API keys in the UI. Images NEVER use Groq or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine. Spell it Groq (inference) not Grok (xAI).",
+      "Agent text chat uses BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Default model gemma-4-26b unless they change it. Images NEVER use BluesMinds or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -225,7 +225,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Free image routing",
     description: "Decision tree: Horde-first Soft/Suggestive/NSFW / Pollinations fallback",
     body:
-      "Routing decision tree (free-only images): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Agent chat text may use free Groq if a key is already stored; that is not an image path.",
+      "Routing decision tree (free-only images): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Agent chat text uses BluesMinds when keyed; that is not an image path.",
     enabled: true,
     modes: ["studio", "both"],
   },

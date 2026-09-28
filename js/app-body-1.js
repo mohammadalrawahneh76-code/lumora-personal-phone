@@ -1284,6 +1284,24 @@ function getGroqKey() {
   return load(KEYS.groqKey, "") || "";
 }
 
+
+function getBluesmindsKey() {
+  const el = $("#agentBluesmindsKey");
+  const fromInput = el ? el.value.trim() : "";
+  if (fromInput) return fromInput;
+  return load(KEYS.bluesmindsKey, "") || "";
+}
+
+const BLUESMINDS_MODEL_DEFAULT = "gemma-4-26b";
+
+function getBluesmindsModel() {
+  const el = $("#agentBluesmindsModel");
+  const fromInput = el ? el.value.trim() : "";
+  if (fromInput) return fromInput;
+  return load(KEYS.bluesmindsModel, BLUESMINDS_MODEL_DEFAULT) || BLUESMINDS_MODEL_DEFAULT;
+}
+
+
 function getNvidiaKey() {
   const el = $("#agentNvidiaKey");
   const fromInput = el ? el.value.trim() : "";

@@ -1019,6 +1019,37 @@ function wireAgent() {
   }
   syncAgentGenBtn();
   renderAgentEnginesPanel();
+
+  // BluesMinds key + model (Agent Chat) — persist to aips_* localStorage; never log the key
+  const bmKeyEl = $("#agentBluesmindsKey");
+  if (bmKeyEl && !bmKeyEl.dataset.bound) {
+    bmKeyEl.dataset.bound = "1";
+    const storedKey = load(KEYS.bluesmindsKey, "") || "";
+    if (storedKey) bmKeyEl.value = storedKey;
+    const persistBmKey = () => {
+      save(KEYS.bluesmindsKey, bmKeyEl.value.trim());
+    };
+    bmKeyEl.addEventListener("change", persistBmKey);
+    bmKeyEl.addEventListener("blur", persistBmKey);
+  }
+  const bmModelEl = $("#agentBluesmindsModel");
+  if (bmModelEl && !bmModelEl.dataset.bound) {
+    bmModelEl.dataset.bound = "1";
+    const def =
+      typeof BLUESMINDS_MODEL_DEFAULT !== "undefined"
+        ? BLUESMINDS_MODEL_DEFAULT
+        : "gemma-4-26b";
+    const storedModel = load(KEYS.bluesmindsModel, def) || def;
+    bmModelEl.value = storedModel;
+    const persistBmModel = () => {
+      const v = bmModelEl.value.trim() || def;
+      bmModelEl.value = v;
+      save(KEYS.bluesmindsModel, v);
+    };
+    bmModelEl.addEventListener("change", persistBmModel);
+    bmModelEl.addEventListener("blur", persistBmModel);
+  }
+
   const input = $("#agentInput");
   if (input) {
     input.addEventListener("keydown", (e) => {

@@ -23,7 +23,7 @@ ES modules require HTTP (not `file://`).
 | **Library** | Media · Calendar · Checklist |
 | **Agent** | Chat · Skills |
 
-Image generation uses the app’s default backend (no provider picker). Chat uses quiet fallbacks until Cloudflare Workers AI is wired.
+Image generation uses the app’s default backend (no provider picker). Agent **Chat** uses **BluesMinds** (`api.bluesminds.com`) — paste a key from the console token page; stored as `aips_bluesminds_key` in this browser only. Default model: `gemma-4-26b` (overridable).
 
 ## Project structure
 
@@ -37,7 +37,7 @@ js/
   starters/         # Lila Bloom starter
   data/             # Captions, presets, skills, wizard
 proxy/
-  nvidia-worker.js  # Cloudflare Worker (legacy NIM CORS; Workers AI comes next)
+  nvidia-worker.js  # Cloudflare Worker (legacy NIM/Flux CORS proxy; optional)
   README.md         # Deploy notes
 ```
 

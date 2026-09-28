@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="./style.css?v=20260928j" />
+<link rel="stylesheet" href="./style.css?v=20260928k" />
 </head>
 <body>
 <button class="skip" onclick="document.getElementById('main').focus()">Skip to content</button>
@@ -610,7 +610,24 @@
       <div class="ws-panel" id="panel-agent" role="tabpanel">
         <div class="panel-head">
           <h2 class="h3">Chat</h2>
-          <p class="hint">Studio co-pilot or in-character Lila. Free text in this browser — Cloudflare Workers AI wiring comes next.</p>
+          <p class="hint">Studio co-pilot or in-character Lila. Chat runs on BluesMinds (key stored in this browser only).</p>
+        </div>
+        <div class="agent-bm-box" id="agentBluesmindsBox">
+          <label class="field agent-bm-key-field">
+            <span class="label">BluesMinds API key</span>
+            <input type="password" id="agentBluesmindsKey" autocomplete="off" spellcheck="false" placeholder="sk-…" enterkeyhint="done" />
+          </label>
+          <label class="field agent-bm-model-field">
+            <span class="label">Model</span>
+            <input type="text" id="agentBluesmindsModel" list="agentBluesmindsModelList" maxlength="120" placeholder="gemma-4-26b" spellcheck="false" autocomplete="off" />
+            <datalist id="agentBluesmindsModelList">
+              <option value="gemma-4-26b"></option>
+              <option value="llama-8b-fast"></option>
+              <option value="meta/llama-3.1-8b-instruct"></option>
+              <option value="deepseek/deepseek-reasoner"></option>
+            </datalist>
+          </label>
+          <p class="hint">BluesMinds key from api.bluesminds.com/console/token · default model <code>gemma-4-26b</code> (from Model Square / pricing).</p>
         </div>
         <div class="seg agent-mode-seg" id="agentModeSeg" role="radiogroup" aria-label="Agent mode">
           <button type="button" class="on" data-v="studio">Studio</button>
@@ -770,6 +787,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js?v=20260928j"></script>
+<script type="module" src="./js/app.js?v=20260928k"></script>
 </body>
 </html>

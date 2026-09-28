@@ -219,11 +219,11 @@ function buildSkillsBlock(mode) {
 function buildStudioSystem(c) {
   const name = (c && c.name) || "the character";
   return (
-    "You are Lumora Personal's free studio co-pilot on a phone web app. " +
+    "You are Lumora Personal's studio co-pilot on a phone web app. " +
     "Help with character bible, prompt craft, Soft/Suggestive/NSFW scene generation, " +
-    "AI Horde vs Pollinations (both free), captions, and calendar ideas. " +
-    "You own Agent Engines: Image Engine (ready, free Horde/Pollinations), Video Engine (honest free stub), and Agent chat (free Groq when keyed, else Pollinations). " +
-    "Never invent paid steps or ask the user to buy credits. Never suggest paid xAI Grok Imagine. " +
+    "AI Horde vs Pollinations (both free for images), captions, and calendar ideas. " +
+    "Agent chat uses BluesMinds. Image generation uses free Horde/Pollinations; video is an honest free stub. " +
+    "Never invent paid steps. Never suggest paid xAI Grok Imagine. " +
     "Be concise for mobile. Current character: " +
     name +
     ". Adult fictional 21+ only."
@@ -605,60 +605,80 @@ async function callPollinationsGet(messages) {
   return String(text).trim();
 }
 
+
+const BLUESMINDS_API = "https://api.bluesminds.com/v1/chat/completions";
+
+async function callBluesmindsChat(messages) {
+  const key = typeof getBluesmindsKey === "function" ? getBluesmindsKey() : "";
+  if (!key) {
+    throw new Error(
+      "Add a BluesMinds API key above (from api.bluesminds.com/console/token) to chat."
+    );
+  }
+  const model =
+    (typeof getBluesmindsModel === "function" && getBluesmindsModel()) ||
+    (typeof BLUESMINDS_MODEL_DEFAULT !== "undefined" ? BLUESMINDS_MODEL_DEFAULT : "gemma-4-26b");
+  const payload = {
+    model: model,
+    messages: normalizeChatMessages(messages),
+    temperature: 0.7,
+    stream: false,
+  };
+  let res;
+  try {
+    res = await fetch(BLUESMINDS_API, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      headers: {
+        Authorization: "Bearer " + key,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    throw new Error(
+      friendlyTextApiError(err, "BluesMinds") ||
+        "Could not reach BluesMinds (network or CORS)."
+    );
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const errObj = data && data.error;
+    const msg =
+      (errObj && (typeof errObj === "string" ? errObj : errObj.message || errObj.code)) ||
+      (data && (data.message || data.detail)) ||
+      "";
+    const textMsg = typeof msg === "string" ? msg : JSON.stringify(msg || "");
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(
+        "Invalid BluesMinds key — get one at api.bluesminds.com/console/token."
+      );
+    }
+    if (res.status === 429) {
+      throw new Error("BluesMinds rate limit — wait a moment and try again.");
+    }
+    if (res.status === 404 || /model|not found|deprecat/i.test(textMsg)) {
+      throw new Error(
+        "BluesMinds model unavailable (" +
+          model +
+          ") — try gemma-4-26b or another id from Model Square."
+      );
+    }
+    throw new Error(textMsg || "BluesMinds error (" + res.status + ")");
+  }
+  const textOut = extractChatContent(data);
+  if (!String(textOut).trim()) throw new Error("Empty BluesMinds reply");
+  return String(textOut).trim();
+}
+
 async function agentAsk(userText) {
   const mode = getAgentMode();
   const c = current();
   const messages = buildAgentMessages(mode, userText, c);
-  const errors = [];
-  // Prefer NVIDIA Kimi when keyed, then Groq, else Pollinations chain
-  try {
-    const nvReply = await tryNvidiaChat(messages);
-    if (nvReply) return nvReply;
-  } catch (err) {
-    errors.push(err);
-    const msg = String((err && err.message) || "");
-    if (!/Add an NVIDIA NIM key|Add an OpenRouter API key/i.test(msg)) {
-      // keep for final throw / fall through
-    }
-  }
-  try {
-    const groqReply = await tryGroqChat(messages);
-    if (groqReply) return groqReply;
-  } catch (err) {
-    errors.push(err);
-    // Missing key is expected — fall through quietly to Pollinations
-    const msg = String((err && err.message) || "");
-    if (!/Add a free Groq key/i.test(msg)) {
-      // keep error for final throw if all fail
-    }
-  }
-  const models = ["openai", "openai-fast", "mistral"];
-  for (let i = 0; i < models.length; i++) {
-    try {
-      return await callPollinationsChat(messages, models[i]);
-    } catch (err) {
-      errors.push(err);
-    }
-  }
-  try {
-    return await callGenPollinationsChat(messages);
-  } catch (err) {
-    errors.push(err);
-  }
-  try {
-    return await callPollinationsGet(messages);
-  } catch (err) {
-    errors.push(err);
-  }
-  const last = errors[errors.length - 1];
-  const lastMsg = String((last && last.message) || "");
-  if (/Add a free Groq key/i.test(lastMsg) && errors.length === 1) {
-    throw new Error(lastMsg);
-  }
-  throw new Error(
-    friendlyTextApiError(last, "Agent text") ||
-      "All text endpoints failed — try again in a moment."
-  );
+  // BluesMinds is the sole Agent chat backend (CORS-open; key in localStorage).
+  return await callBluesmindsChat(messages);
 }
 
 function syncAgentModeSeg() {
@@ -832,40 +852,7 @@ async function agentAskModeScene(userText, c) {
     { role: "system", content: system },
     { role: "user", content: String(userText || "").slice(0, 800) },
   ];
-  const errors = [];
-  try {
-    const nvReply = await tryNvidiaChat(messages);
-    if (nvReply) return nvReply;
-  } catch (err) {
-    errors.push(err);
-  }
-  try {
-    const groqReply = await tryGroqChat(messages);
-    if (groqReply) return groqReply;
-  } catch (err) {
-    errors.push(err);
-  }
-  for (const model of ["openai", "openai-fast", "mistral"]) {
-    try {
-      return await callPollinationsChat(messages, model);
-    } catch (err) {
-      errors.push(err);
-    }
-  }
-  try {
-    return await callGenPollinationsChat(messages);
-  } catch (err) {
-    errors.push(err);
-  }
-  try {
-    return await callPollinationsGet(messages);
-  } catch (err) {
-    errors.push(err);
-  }
-  throw new Error(
-    friendlyTextApiError(errors[errors.length - 1], "Prompt build") ||
-      "Prompt build failed"
-  );
+  return await callBluesmindsChat(messages);
 }
 
 function saveAgentGenToMedia(c, imageUrl, label, notes, aspect) {
