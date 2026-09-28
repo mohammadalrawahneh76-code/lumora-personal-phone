@@ -353,16 +353,16 @@
             </div>
             <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
           </div>
-          <p class="gen-api-note">Image gen uses a short identity lock; Copy still uses your full master sheet. Pollinations and AI Horde are free. Grok Imagine requires a paid xAI API key/credits — skip it if you don't want to pay. Soft / Suggestive → Pollinations (free); NSFW → AI Horde (free). AI Horde free NSFW now targets stronger photoreal models; results vary; regenerate if anatomy is broken. Keys stay in this browser only. Adult fictional 21+ only.</p>
+          <p class="gen-api-note">Image gen uses a short identity lock; Copy still uses your full master sheet. Soft / Suggestive / NSFW → AI Horde first (free); Pollinations is Soft/Suggestive fallback; Grok Imagine is paid xAI credits — skip it if you don't want to pay. Optional free Horde key (still $0) speeds queues. Photoreal Horde models preferred; results vary — regenerate if anatomy is broken. Keys stay in this browser only. Adult fictional 21+ only.</p>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
               <label class="field">
                 <span class="label">Provider</span>
                 <select id="genProvider">
+                  <option value="horde" selected>AI Horde (free · Soft/Suggestive/NSFW)</option>
+                  <option value="pollinations">Pollinations (free Soft/Suggestive fallback)</option>
                   <option value="grok">Grok Imagine (xAI · paid credits)</option>
-                  <option value="pollinations">Pollinations (free)</option>
-                  <option value="horde">AI Horde (better NSFW)</option>
                 </select>
               </label>
               <label class="field" id="genXaiKeyField" hidden>
@@ -370,17 +370,39 @@
                 <input type="password" id="genXaiKey" maxlength="200" placeholder="Paste xAI API key" autocomplete="off" />
                 <span class="hint gen-grok-paid-hint" id="genGrokPaidHint">Paid — needs credits at console.x.ai. Use Pollinations or AI Horde for free.</span>
               </label>
-              <label class="field" id="genHordeKeyField" hidden>
-                <span class="label">AI Horde API key <em>optional · anonymous 0000000000 has rate limits</em></span>
-                <input type="text" id="genHordeKey" maxlength="64" placeholder="0000000000 or paste key from stablehorde.net" autocomplete="off" />
+              <label class="field" id="genHordeKeyField">
+                <span class="label">Free AI Horde API key <em>optional · still $0</em></span>
+                <input type="text" id="genHordeKey" maxlength="64" placeholder="Leave blank for anonymous" autocomplete="off" />
+                <span class="hint">Free key from <a href="https://stablehorde.net/register" target="_blank" rel="noopener">stablehorde.net/register</a> — faster queues, still $0. Leave blank for anonymous.</span>
               </label>
               <label class="field">
                 <span class="label">Seed <em>blank = random</em></span>
                 <input type="text" id="genSeed" inputmode="numeric" maxlength="16" placeholder="e.g. 42" />
               </label>
               <label class="field">
-                <span class="label">Model <em>Pollinations / Horde, or grok-* for Grok</em></span>
-                <input type="text" id="genModel" maxlength="40" placeholder="e.g. flux or grok-imagine-image-2.0" />
+                <span class="label">Model <em>blank = auto photoreal Horde list</em></span>
+                <input type="text" id="genModel" list="hordeModelList" maxlength="80" placeholder="blank = auto photoreal list" autocomplete="off" />
+                <datalist id="hordeModelList">
+                  <option value="ICBINP - I Can't Believe It's Not Photography"></option>
+                  <option value="ICBINP XL"></option>
+                  <option value="Realistic Vision"></option>
+                  <option value="AbsoluteReality"></option>
+                  <option value="Juggernaut XL"></option>
+                  <option value="AlbedoBase XL 3.1"></option>
+                  <option value="AlbedoBase XL (SDXL)"></option>
+                  <option value="Deliberate 3.0"></option>
+                  <option value="Analog Madness"></option>
+                  <option value="Epic Diffusion"></option>
+                  <option value="Babes"></option>
+                  <option value="Photon"></option>
+                  <option value="Realism Engine"></option>
+                  <option value="majicMIX realistic"></option>
+                  <option value="Pony Realism"></option>
+                  <option value="CyberRealistic Pony"></option>
+                  <option value="WAI-NSFW-illustrious-SDXL"></option>
+                  <option value="flux"></option>
+                  <option value="grok-imagine-image-2.0"></option>
+                </datalist>
               </label>
             </div>
           </details>
@@ -509,7 +531,7 @@
             <button type="button" class="btn btn-ghost" id="agentVideoBtn">Generate video</button>
             <button type="button" class="btn btn-ghost btn-sm" id="agentClearBtn">Clear chat</button>
           </div>
-          <p class="hint agent-gen-hint">Agent engines: Image (free Horde/Pollinations) · Video (free stub). Agent writes the prompt — no need to open Studio Generate.</p>
+          <p class="hint agent-gen-hint">Agent engines: Image (free Horde-first, Pollinations fallback) · Video (free stub). Agent writes the prompt — no need to open Studio Generate.</p>
         </div>
         <details class="agent-engines-box" id="agentEnginesDetails" open>
           <summary>Engines</summary>

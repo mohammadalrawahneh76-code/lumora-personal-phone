@@ -14,6 +14,7 @@
     xaiKey: PREFIX + "xai_key",
     genProvider: PREFIX + "gen_provider",
     agentSkills: PREFIX + "agent_skills",
+    hordeSoftSkillsV1: PREFIX + "horde_soft_skills_v1",
     agentChatStudio: PREFIX + "agent_chat_studio",
     agentChatLila: PREFIX + "agent_chat_lila",
     agentMode: PREFIX + "agent_mode",
@@ -982,17 +983,38 @@
 
   const HORDE_MODELS_SOFT = [
     "ICBINP - I Can't Believe It's Not Photography",
+    "ICBINP XL",
     "Realistic Vision",
     "AbsoluteReality",
     "Juggernaut XL",
+    "AlbedoBase XL 3.1",
     "AlbedoBase XL (SDXL)",
+    "Deliberate 3.0",
+    "Analog Madness",
+    "Epic Diffusion",
+    "Babes",
+    "Photon",
+    "Realism Engine",
+    "majicMIX realistic",
   ];
-  // Photoreal first for NSFW; anime WAI only as fallback secondary
+  // Photoreal first for NSFW; Pony secondary; WAI anime last resort
   const HORDE_MODELS_NSFW = [
     "ICBINP - I Can't Believe It's Not Photography",
+    "ICBINP XL",
     "Realistic Vision",
     "AbsoluteReality",
     "Juggernaut XL",
+    "AlbedoBase XL 3.1",
+    "AlbedoBase XL (SDXL)",
+    "Deliberate 3.0",
+    "Analog Madness",
+    "Epic Diffusion",
+    "Babes",
+    "Photon",
+    "Realism Engine",
+    "majicMIX realistic",
+    "Pony Realism",
+    "CyberRealistic Pony",
     "WAI-NSFW-illustrious-SDXL",
   ];
   const HORDE_NEGATIVE =
@@ -1133,9 +1155,9 @@
     if (el && (el.value === "grok" || el.value === "horde" || el.value === "pollinations")) {
       return el.value;
     }
-    const v = load(KEYS.genProvider, "pollinations") || "pollinations";
-    if (v === "grok" || v === "horde") return v;
-    return "pollinations";
+    const v = load(KEYS.genProvider, "horde") || "horde";
+    if (v === "grok" || v === "pollinations") return v;
+    return "horde";
   }
 
   function setGenProvider(provider) {
@@ -1157,19 +1179,25 @@
   }
 
   function syncProviderForMode(mode) {
-    if (mode === "nsfw") {
-      // Prefer AI Horde for NSFW (Pollinations often filters / URL limits)
-      // Honor explicit Grok choice
-      if (getGenProvider() !== "grok") {
-        setGenProvider("horde");
-      } else {
-        syncUseHordeBtn();
-        syncHordeKeyVisibility();
-      }
-    } else {
+    const selected = getGenProvider();
+    // Honor explicit Grok always
+    if (selected === "grok") {
       syncUseHordeBtn();
       syncHordeKeyVisibility();
+      return;
     }
+    // NSFW forces Horde (Pollinations often filters)
+    if (mode === "nsfw") {
+      setGenProvider("horde");
+      return;
+    }
+    // Soft/Suggestive: prefer Horde unless user explicitly picked Pollinations
+    if (selected !== "pollinations") {
+      setGenProvider("horde");
+      return;
+    }
+    syncUseHordeBtn();
+    syncHordeKeyVisibility();
   }
 
   function prepareGenPrompt(full, mode) {
@@ -1180,12 +1208,16 @@
   function resolveGenProvider(mode, imagePrompt) {
     const selected = getGenProvider();
     if (selected === "grok") return "grok";
-    if (selected === "horde") return "horde";
-    if (mode === "nsfw") return "horde";
-    const len = (imagePrompt || "").length;
-    const enc = encodeURIComponent(imagePrompt || "").length;
-    if (len > IMAGE_PROMPT_MAX || enc > POLLINATIONS_URL_SAFE) return "horde";
-    return "pollinations";
+    // Explicit Pollinations: honor for Soft/Suggestive; NSFW still forces Horde
+    if (selected === "pollinations") {
+      if (mode === "nsfw") return "horde";
+      const len = (imagePrompt || "").length;
+      const enc = encodeURIComponent(imagePrompt || "").length;
+      if (len > IMAGE_PROMPT_MAX || enc > POLLINATIONS_URL_SAFE) return "horde";
+      return "pollinations";
+    }
+    // Default / Horde selected / Soft / Suggestive / NSFW → Horde first
+    return "horde";
   }
 
   function buildPollinationsUrl(prompt, aspect, mode) {
@@ -1644,6 +1676,21 @@
       const url = await generateWithHorde(imagePrompt, aspect, mode);
       await showGenPreview(url, { allowHordeFallback: false });
     } catch (err) {
+      // Soft/Suggestive: mirror Agent Image Engine — Pollinations fallback after Horde
+      if (mode !== "nsfw") {
+        toast("Horde failed — trying Pollinations (free)…");
+        const pollUrl = buildPollinationsUrl(imagePrompt, aspect, mode);
+        if (pollUrl.length <= 2200) {
+          await showGenPreview(pollUrl, {
+            allowHordeFallback: false,
+            imagePrompt,
+            aspect,
+            mode,
+            timeoutMs: 90000,
+          });
+          return;
+        }
+      }
       setGenLoading(false);
       state.lastGenUrl = null;
       toast((err && err.message) || "AI Horde generation failed");
@@ -1821,7 +1868,8 @@
     const provider = getGenProvider();
     const hordeField = $("#genHordeKeyField");
     const xaiField = $("#genXaiKeyField");
-    if (hordeField) hordeField.hidden = provider !== "horde";
+    // Always visible under Advanced so Soft users see the free key path
+    if (hordeField) hordeField.hidden = false;
     if (xaiField) xaiField.hidden = provider !== "grok";
     syncUseHordeBtn();
   }
@@ -2070,7 +2118,7 @@
       name: "Image quality (free)",
       description: "Prefer Horde for photoreal; Soft/Suggestive first; wait & regenerate",
       body:
-        "Prefer AI Horde for photoreal NSFW or when Pollinations looks doll-like. Soft/Suggestive first. Pollinations is free but often doll-like. Wait 1–3 min for Horde. Regenerate broken anatomy. Free only — never suggest paid Grok credits or any paid API. Skip paid Grok Imagine unless the user already chose it knowing it costs credits.",
+        "Soft/Suggestive/NSFW → AI Horde first (free photoreal). Pollinations is Soft/Suggestive fallback only. Wait 1–3 min for Horde. Regenerate broken anatomy. Free only — never suggest paid Grok credits or any paid API. Skip paid Grok Imagine unless the user already chose it knowing it costs credits.",
       enabled: true,
       modes: ["studio"],
     },
@@ -2149,7 +2197,7 @@
       name: "Agent engines",
       description: "Agent owns Image Engine + Video stub — ask to generate",
       body:
-        "The Agent owns named engines (not just Studio coaching). Image Engine (ready): free AI Horde + Pollinations with face-lock and Soft/Suggestive/NSFW routing — ask “generate an image of…” or tap Generate image. Video Engine (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent engines over opening the Studio Generate tab. Never invent paid free video or claim Seedance works free.",
+        "The Agent owns named engines (not just Studio coaching). Image Engine (ready): free AI Horde first for Soft/Suggestive/NSFW, Pollinations Soft/Suggestive fallback, face-lock — ask “generate an image of…” or tap Generate image. Optional free Horde key (still $0) speeds queues. Video Engine (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent engines over opening the Studio Generate tab. Never invent paid free video or claim Seedance works free.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2161,7 +2209,7 @@
       name: "Grok Imagine workflow",
       description: "When/how to use paid Grok Imagine; 402 handling; when to skip",
       body:
-        "Grok Imagine (provider Grok in Advanced) needs a paid xAI API key pasted in Settings — it spends xAI credits and is NOT free. Walk the user: Advanced → provider Grok → paste key from console.x.ai → generate. On 402/insufficient credits, tell them clearly and switch to AI Horde (free NSFW photoreal) or Pollinations (free Soft/Suggestive). Prefer Horde/Pollinations unless the user accepts paid. Grok may filter explicit NSFW — for hard NSFW recommend Horde. Never invent free Grok paths.",
+        "Grok Imagine (provider Grok in Advanced) needs a paid xAI API key pasted in Settings — it spends xAI credits and is NOT free. Walk the user: Advanced → provider Grok → paste key from console.x.ai → generate. On 402/insufficient credits, tell them clearly and switch to AI Horde (free Soft/Suggestive/NSFW photoreal) — Pollinations only as Soft/Suggestive fallback. Prefer Horde unless the user accepts paid. Grok may filter explicit NSFW — for hard NSFW recommend Horde. Never invent free Grok paths.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2177,9 +2225,9 @@
     {
       id: "free-vs-paid-routing",
       name: "Free vs paid routing",
-      description: "Decision tree: Pollinations / Horde / paid Grok",
+      description: "Decision tree: Horde-first Soft/Suggestive/NSFW / paid Grok",
       body:
-        "Routing decision tree (free-first): Soft or Suggestive → Pollinations or AI Horde. NSFW photoreal → AI Horde (wait 1–3 min). Grok Imagine ONLY if the user already chose provider Grok and accepts paid xAI credits — otherwise steer to Horde/Pollinations. On doll skin, melted hands, multi-face, or blobs → regenerate; try Horde if Pollinations failed. Never push buying credits.",
+        "Routing decision tree (free-first): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Grok Imagine ONLY if the user already chose provider Grok and accepts paid xAI credits — otherwise steer to Horde. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Never push buying credits.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2206,7 +2254,7 @@
       name: "Lingerie tease scenes",
       description: "Silk robe, bralette, garters; Soft/Suggestive/NSFW + face-lock",
       body:
-        "Lingerie tease pack: silk robe slip, pastel lace bralette, matching panties, thigh garters, sheer stockings. Soft = robe mostly closed; Suggestive = robe open over lingerie; NSFW = lingerie-only or removing pieces. Always Face-lock ON with short identity + scene only. Warm bedroom lamp, shy glance. Adult 21+ consensual. Prefer Horde for NSFW photoreal; Pollinations OK for Soft/Suggestive.",
+        "Lingerie tease pack: silk robe slip, pastel lace bralette, matching panties, thigh garters, sheer stockings. Soft = robe mostly closed; Suggestive = robe open over lingerie; NSFW = lingerie-only or removing pieces. Always Face-lock ON with short identity + scene only. Warm bedroom lamp, shy glance. Adult 21+ consensual. Prefer Horde for Soft/Suggestive/NSFW photoreal; Pollinations only as Soft/Suggestive fallback.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2400,6 +2448,38 @@
     );
     if (extras.length) {
       setAgentSkills([...(list || []), ...extras.map((s) => ({ ...s }))]);
+      list = getAgentSkills();
+    }
+    // One-shot: refresh Horde-first Soft routing copy on known system skills
+    if (!load(KEYS.hordeSoftSkillsV1, false)) {
+      const canon = {};
+      [...STARTER_AGENT_SKILLS, ...APOB_AGENT_SKILLS, ...GROK_NSFW_AGENT_SKILLS, ...AGENT_ENGINES_SKILLS].forEach(
+        (s) => {
+          if (s && s.id) canon[s.id] = s;
+        }
+      );
+      const refreshIds = [
+        "studio-image-quality",
+        "free-vs-paid-routing",
+        "grok-imagine-workflow",
+        "lingerie-tease",
+        "agent-engines",
+      ];
+      let changed = false;
+      list = (list || []).map((s) => {
+        if (refreshIds.indexOf(s.id) >= 0 && canon[s.id]) {
+          changed = true;
+          return {
+            ...s,
+            name: canon[s.id].name,
+            description: canon[s.id].description,
+            body: canon[s.id].body,
+          };
+        }
+        return s;
+      });
+      if (changed) setAgentSkills(list);
+      save(KEYS.hordeSoftSkillsV1, true);
     }
   }
   function skillApplies(skill, mode) {
@@ -3037,12 +3117,16 @@
       AgentEngines.image,
       AgentEngines.video,
     ];
-    el.innerHTML = items
+    const hordeKey = (typeof getHordeKey === "function" ? getHordeKey() : "") || "";
+    const keySaved = !!(hordeKey && hordeKey !== HORDE_ANON_KEY);
+    const keyBadge = keySaved ? "saved" : "anon";
+    const keyLabel = keySaved ? "saved" : "anonymous";
+    const rows = items
       .map((eng) => {
         const ready = eng.status === "ready";
         const badge = ready ? "ready" : "stub";
         const detail = ready
-          ? "Free AI Horde + Pollinations · face-lock · Soft/Suggestive/NSFW"
+          ? "Free AI Horde first (Soft/Suggestive/NSFW) · Pollinations fallback · face-lock"
           : "Free stub — no Seedance/APOB-quality video without keys/payment yet";
         return (
           '<div class="agent-engine-row">' +
@@ -3060,6 +3144,19 @@
         );
       })
       .join("");
+    const keyRow =
+      '<div class="agent-engine-row agent-horde-key-row">' +
+      '<span class="agent-engine-name">Horde key</span>' +
+      '<span class="agent-engine-badge ' +
+      keyBadge +
+      '">' +
+      keyLabel +
+      "</span>" +
+      '<span class="agent-engine-detail">' +
+      "Set free Horde key in Generate → Advanced · " +
+      '<a href="https://stablehorde.net/register" target="_blank" rel="noopener">Register (still $0)</a>' +
+      "</span></div>";
+    el.innerHTML = rows + keyRow;
   }
 
 
@@ -3771,18 +3868,17 @@
     });
     const providerEl = $("#genProvider");
     if (providerEl) {
-      const storedProvider = load(KEYS.genProvider, "pollinations");
+      const storedProvider = load(KEYS.genProvider, "horde") || "horde";
       const initialMode = load(KEYS.genMode, "soft");
-      // Restore Grok if saved; NSFW defaults to Horde otherwise
+      // Default Horde (free Soft-first). Honor Grok or explicit Pollinations.
       if (storedProvider === "grok") {
         providerEl.value = "grok";
-      } else if (initialMode === "nsfw") {
-        providerEl.value = "horde";
-      } else if (storedProvider === "horde") {
-        providerEl.value = "horde";
-      } else {
+      } else if (storedProvider === "pollinations" && initialMode !== "nsfw") {
         providerEl.value = "pollinations";
+      } else {
+        providerEl.value = "horde";
       }
+      save(KEYS.genProvider, providerEl.value);
       providerEl.addEventListener("change", () => {
         setGenProvider(providerEl.value);
       });
@@ -3798,12 +3894,12 @@
     if (hordeKeyEl) {
       const storedKey = load(KEYS.hordeKey, "");
       if (storedKey) hordeKeyEl.value = storedKey;
-      hordeKeyEl.addEventListener("change", () => {
+      const persistHordeKey = () => {
         save(KEYS.hordeKey, hordeKeyEl.value.trim());
-      });
-      hordeKeyEl.addEventListener("blur", () => {
-        save(KEYS.hordeKey, hordeKeyEl.value.trim());
-      });
+        if (typeof renderAgentEnginesPanel === "function") renderAgentEnginesPanel();
+      };
+      hordeKeyEl.addEventListener("change", persistHordeKey);
+      hordeKeyEl.addEventListener("blur", persistHordeKey);
     }
     const xaiKeyEl = $("#genXaiKey");
     if (xaiKeyEl) {
