@@ -494,7 +494,7 @@
       <div class="ws-panel" id="panel-agent" role="tabpanel">
         <div class="panel-head">
           <h2 class="h3">Agent</h2>
-          <p class="hint">Studio co-pilot or in-character Lila chat. Teach skills below. Free only — data stays in this browser.</p>
+          <p class="hint">Studio co-pilot or in-character Lila chat. Agent owns Image + Video engines below. Free only — data stays in this browser.</p>
         </div>
         <div class="seg agent-mode-seg" id="agentModeSeg" role="radiogroup" aria-label="Agent mode">
           <button type="button" class="on" data-v="studio">Studio</button>
@@ -506,10 +506,15 @@
           <div class="composer-row">
             <button type="button" class="btn btn-light" id="agentSendBtn">Send</button>
             <button type="button" class="btn btn-ghost" id="agentGenBtn">Generate image</button>
+            <button type="button" class="btn btn-ghost" id="agentVideoBtn">Generate video</button>
             <button type="button" class="btn btn-ghost btn-sm" id="agentClearBtn">Clear chat</button>
           </div>
-          <p class="hint agent-gen-hint">Generate image uses free AI Horde (photoreal/NSFW) or Pollinations — Agent writes the prompt.</p>
+          <p class="hint agent-gen-hint">Agent engines: Image (free Horde/Pollinations) · Video (free stub). Agent writes the prompt — no need to open Studio Generate.</p>
         </div>
+        <details class="agent-engines-box" id="agentEnginesDetails" open>
+          <summary>Engines</summary>
+          <div id="agentEnginesList" class="agent-engines-list"></div>
+        </details>
         <details class="agent-skills-box" id="agentSkillsDetails">
           <summary>Skills</summary>
           <div class="toolbar" style="margin-top:10px">

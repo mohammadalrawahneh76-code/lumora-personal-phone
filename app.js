@@ -1502,17 +1502,34 @@
 
   function syncAgentGenBtn() {
     const btn = $("#agentGenBtn");
-    if (!btn) return;
+    const vidBtn = $("#agentVideoBtn");
     const busy = !!(state.agentLoading || state.genLoading);
-    btn.disabled = busy;
-    btn.classList.toggle("is-loading", busy);
-    btn.textContent = busy && state.genLoading && !state.agentLoading
-      ? "Generating…"
-      : busy && state.agentLoading
-        ? (state.agentStatusText && /Queuing|Horde|Pollinations|Building/i.test(state.agentStatusText)
-            ? "Generating…"
-            : "Working…")
-        : "Generate image";
+    const imgBusyText =
+      busy && state.genLoading && !state.agentLoading
+        ? "Generating…"
+        : busy && state.agentLoading
+          ? (state.agentStatusText &&
+            /Queuing|Horde|Pollinations|Building|Image Engine|Video Engine/i.test(
+              state.agentStatusText
+            )
+              ? /Video Engine/i.test(state.agentStatusText || "")
+                ? "Video…"
+                : "Generating…"
+              : "Working…")
+          : "Generate image";
+    if (btn) {
+      btn.disabled = busy;
+      btn.classList.toggle("is-loading", busy);
+      btn.textContent = imgBusyText;
+    }
+    if (vidBtn) {
+      vidBtn.disabled = busy;
+      vidBtn.classList.toggle("is-loading", busy && /Video Engine/i.test(state.agentStatusText || ""));
+      vidBtn.textContent =
+        busy && /Video Engine/i.test(state.agentStatusText || "")
+          ? "Video…"
+          : "Generate video";
+    }
     const sendBtn = $("#agentSendBtn");
     if (sendBtn) sendBtn.disabled = !!state.agentLoading;
   }
@@ -1830,7 +1847,7 @@
             '" style="aspect-ratio:' +
             ratio +
             '"><span class="tag">' +
-            (m.imageUrl ? "Gen" : "Note") +
+            (m.type === "video-pending" ? "Video…" : m.imageUrl ? "Gen" : "Note") +
             '</span><img src="' +
             esc(src) +
             '" alt="' +
@@ -2125,6 +2142,19 @@
     },
   ];
 
+
+  const AGENT_ENGINES_SKILLS = [
+    {
+      id: "agent-engines",
+      name: "Agent engines",
+      description: "Agent owns Image Engine + Video stub — ask to generate",
+      body:
+        "The Agent owns named engines (not just Studio coaching). Image Engine (ready): free AI Horde + Pollinations with face-lock and Soft/Suggestive/NSFW routing — ask “generate an image of…” or tap Generate image. Video Engine (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent engines over opening the Studio Generate tab. Never invent paid free video or claim Seedance works free.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+  ];
+
   const GROK_NSFW_AGENT_SKILLS = [
     {
       id: "grok-imagine-workflow",
@@ -2365,7 +2395,7 @@
     }
     // Merge taught skill packs if missing by id (never wipe user skills)
     const have = new Set((list || []).map((s) => s.id));
-    const extras = [...APOB_AGENT_SKILLS, ...GROK_NSFW_AGENT_SKILLS].filter(
+    const extras = [...APOB_AGENT_SKILLS, ...GROK_NSFW_AGENT_SKILLS, ...AGENT_ENGINES_SKILLS].filter(
       (s) => !have.has(s.id)
     );
     if (extras.length) {
@@ -2410,6 +2440,7 @@
       "You are Lumora Personal's free studio co-pilot on a phone web app. " +
       "Help with character bible, prompt craft, Soft/Suggestive/NSFW scene generation, " +
       "AI Horde vs Pollinations (both free), captions, and calendar ideas. " +
+      "You own Agent Engines: Image Engine (ready, free Horde/Pollinations) and Video Engine (honest free stub — no Seedance/APOB-quality free video). " +
       "Never invent paid steps or ask the user to buy credits. Skip paid Grok unless they already use it. " +
       "Be concise for mobile. Current character: " +
       name +
@@ -2614,7 +2645,7 @@
         '<div class="agent-empty">' +
         (mode === "lila"
           ? "Say hi — Lila will reply in character (free text)."
-          : "Ask for prompt help, captions, generation tips, or tap Generate image.") +
+          : "Ask for prompt help, captions, or use Agent engines — Generate image / Generate video.") +
         "</div>";
       return;
     }
@@ -2719,6 +2750,12 @@
     );
   }
 
+  function looksLikeVideoRequest(text) {
+    return /\b(generat(e|ing)|make|create|render|try)\b[\s\S]{0,40}\b(video|clip|animation|animate|seedance)\b|\b(video|clip)\s+(of|for|please|now)\b/i.test(
+      String(text || "")
+    );
+  }
+
   function parseModeScene(raw, fallbackScene) {
     const text = String(raw || "");
     let mode = "soft";
@@ -2813,6 +2850,219 @@
     img.src = url;
   }
 
+
+  /**
+   * Agent-owned engines — named capabilities the Agent invokes (front door).
+   * Studio Generate tab can still work independently; Agent does not depend on opening it.
+   * Free-only for Agent: AI Horde + Pollinations. Paid Grok Imagine is Studio-only / labeled paid.
+   */
+  const AgentEngines = {
+    image: {
+      id: "agent-image",
+      name: "Image Engine",
+      status: "ready",
+      /**
+       * @param {{ scene: string, mode?: string, aspect?: string, character?: object, onStatus?: function }} opts
+       * @returns {Promise<{ ok: boolean, imageUrl?: string, chatUrl?: string, mediaUrl?: string, provider?: string, prompt?: string, mode?: string, scene?: string, error?: string }>}
+       */
+      async run(opts) {
+        opts = opts || {};
+        const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
+        const c = opts.character || current();
+        const scene = String(opts.scene || "").trim();
+        const mode =
+          opts.mode === "suggestive" || opts.mode === "nsfw" ? opts.mode : "soft";
+        const aspect = opts.aspect || "3:4";
+        if (!c) {
+          return { ok: false, error: "No character open", prompt: "", mode, scene };
+        }
+        if (!scene) {
+          return { ok: false, error: "Describe the scene first", prompt: "", mode, scene };
+        }
+        const imagePrompt = buildImagePrompt(c, scene, mode);
+        if (onStatus) onStatus("Image Engine · queuing AI Horde (free, 1–3 min)…");
+
+        let hordeErr = null;
+        let pollErr = null;
+        let used = "horde";
+
+        try {
+          const rawHorde = await generateWithHorde(imagePrompt, aspect, mode, {
+            onStatus: (t) => {
+              if (onStatus) onStatus("Image Engine · " + t);
+            },
+          });
+          if (onStatus) onStatus("Image Engine · verifying Horde image…");
+          const confirmed = await confirmAgentImage(rawHorde);
+          return {
+            ok: true,
+            imageUrl: confirmed.chatUrl,
+            chatUrl: confirmed.chatUrl,
+            mediaUrl: confirmed.mediaUrl,
+            provider: used,
+            prompt: imagePrompt,
+            mode,
+            scene,
+          };
+        } catch (err) {
+          hordeErr = err;
+        }
+
+        // Soft/Suggestive: Horde first, Pollinations fallback. NSFW stays on Horde.
+        if (mode !== "nsfw") {
+          used = "pollinations";
+          if (onStatus) onStatus("Image Engine · Horde failed — trying Pollinations (free)…");
+          const pollUrl = buildPollinationsUrl(imagePrompt, aspect, mode);
+          if (pollUrl.length > 2200) {
+            return {
+              ok: false,
+              error:
+                "Horde failed (" +
+                ((hordeErr && hordeErr.message) || "error") +
+                "); Pollinations URL too long for fallback.",
+              prompt: imagePrompt,
+              mode,
+              scene,
+              provider: used,
+            };
+          }
+          try {
+            if (onStatus) onStatus("Image Engine · verifying Pollinations image…");
+            const confirmed = await confirmAgentImage(pollUrl);
+            return {
+              ok: true,
+              imageUrl: confirmed.chatUrl,
+              chatUrl: confirmed.chatUrl,
+              mediaUrl: confirmed.mediaUrl,
+              provider: used,
+              prompt: imagePrompt,
+              mode,
+              scene,
+            };
+          } catch (err2) {
+            pollErr = err2;
+            return {
+              ok: false,
+              error:
+                "Horde failed (" +
+                ((hordeErr && hordeErr.message) || "error") +
+                "); Pollinations also failed (" +
+                ((err2 && err2.message) || "image did not load") +
+                "). Tap Generate image to retry.",
+              prompt: imagePrompt,
+              mode,
+              scene,
+              provider: used,
+            };
+          }
+        }
+
+        return {
+          ok: false,
+          error: (hordeErr && hordeErr.message) || "Image Engine failed",
+          prompt: imagePrompt,
+          mode,
+          scene,
+          provider: "horde",
+        };
+      },
+    },
+
+    video: {
+      id: "agent-video",
+      name: "Video Engine",
+      status: "stub",
+      /**
+       * Honest free stub — no Seedance/APOB-quality free CORS video without keys/payment.
+       * @returns {Promise<{ ok: boolean, pending?: boolean, message: string, error?: string, mode?: string, scene?: string }>}
+       */
+      async run(opts) {
+        opts = opts || {};
+        const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
+        const scene = String(opts.scene || "").trim() || "short character clip";
+        const mode =
+          opts.mode === "suggestive" || opts.mode === "nsfw" ? opts.mode : "soft";
+        if (onStatus) onStatus("Video Engine · checking free options…");
+        const message =
+          "Video engine: free video isn’t available yet in Lumora Personal. " +
+          "No CORS-friendly free Seedance/APOB-quality path without keys or payment. " +
+          "I saved a video-pending note for “" +
+          scene.slice(0, 80) +
+          "” (" +
+          mode +
+          "). Use Image Engine for stills meanwhile — or ask again when a free video path lands.";
+        return {
+          ok: false,
+          pending: true,
+          message,
+          error: "Free video stub — not available yet",
+          mode,
+          scene,
+        };
+      },
+    },
+  };
+
+  function agentEngineImage(opts) {
+    return AgentEngines.image.run(opts);
+  }
+  function agentEngineVideo(opts) {
+    return AgentEngines.video.run(opts);
+  }
+
+  function saveAgentVideoPendingToMedia(c, label, notes, aspect, mode) {
+    if (!c) return;
+    const media = [
+      {
+        id: uid("m"),
+        label: String(label || "Video pending").slice(0, 80),
+        notes: String(notes || "").slice(0, 500),
+        aspect: aspect || "9:16",
+        imageDataUrl: null,
+        imageUrl: null,
+        type: "video-pending",
+        mode: mode || "soft",
+        createdAt: new Date().toISOString(),
+        source: "agent-video",
+      },
+      ...(c.media || []),
+    ];
+    updateCharacter(c.id, { media });
+  }
+
+  function renderAgentEnginesPanel() {
+    const el = $("#agentEnginesList");
+    if (!el) return;
+    const items = [
+      AgentEngines.image,
+      AgentEngines.video,
+    ];
+    el.innerHTML = items
+      .map((eng) => {
+        const ready = eng.status === "ready";
+        const badge = ready ? "ready" : "stub";
+        const detail = ready
+          ? "Free AI Horde + Pollinations · face-lock · Soft/Suggestive/NSFW"
+          : "Free stub — no Seedance/APOB-quality video without keys/payment yet";
+        return (
+          '<div class="agent-engine-row">' +
+          '<span class="agent-engine-name">' +
+          esc(eng.name) +
+          "</span>" +
+          '<span class="agent-engine-badge ' +
+          badge +
+          '">' +
+          badge +
+          "</span>" +
+          '<span class="agent-engine-detail">' +
+          esc(detail) +
+          "</span></div>"
+        );
+      })
+      .join("");
+  }
+
+
   async function generateAgentImage() {
     if (state.agentLoading || state.genLoading) return;
     const c = current();
@@ -2834,7 +3084,7 @@
     if (input) input.value = "";
 
     state.agentLoading = true;
-    state.agentStatusText = "Building prompt…";
+    state.agentStatusText = "Image Engine · building prompt…";
     syncAgentGenBtn();
     renderAgentChat();
 
@@ -2850,78 +3100,27 @@
         parsed = parseModeScene("", text);
       }
 
-      state.agentStatusText = "Queuing AI Horde (free, 1–3 min)…";
-      renderAgentChat();
-      syncAgentGenBtn();
-
-      const imagePrompt = buildImagePrompt(c, parsed.scene, parsed.mode);
       setGenLoading(true);
-
-      let chatUrl = null;
-      let mediaUrl = null;
-      let used = "horde";
-      let hordeErr = null;
-      let pollErr = null;
-
-      try {
-        const rawHorde = await generateWithHorde(
-          imagePrompt,
-          aspect,
-          parsed.mode,
-          {
-            onStatus: (t) => {
-              state.agentStatusText = t;
-              renderAgentChat();
-            },
-          }
-        );
-        state.agentStatusText = "Verifying Horde image…";
-        renderAgentChat();
-        const confirmed = await confirmAgentImage(rawHorde);
-        chatUrl = confirmed.chatUrl;
-        mediaUrl = confirmed.mediaUrl;
-      } catch (err) {
-        hordeErr = err;
-        // Soft/Suggestive: Horde first for photoreal, Pollinations fallback. NSFW stays on Horde.
-        if (parsed.mode !== "nsfw") {
-          state.agentStatusText = "Horde failed — trying Pollinations (free)…";
+      const result = await agentEngineImage({
+        scene: parsed.scene,
+        mode: parsed.mode,
+        aspect,
+        character: c,
+        onStatus: (t) => {
+          state.agentStatusText = t;
           renderAgentChat();
-          used = "pollinations";
-          const pollUrl = buildPollinationsUrl(imagePrompt, aspect, parsed.mode);
-          if (pollUrl.length > 2200) {
-            throw new Error(
-              "Horde failed (" +
-                ((hordeErr && hordeErr.message) || "error") +
-                "); Pollinations URL too long for fallback."
-            );
-          }
-          try {
-            state.agentStatusText = "Verifying Pollinations image…";
-            renderAgentChat();
-            const confirmed = await confirmAgentImage(pollUrl);
-            chatUrl = confirmed.chatUrl;
-            mediaUrl = confirmed.mediaUrl;
-          } catch (err2) {
-            pollErr = err2;
-            throw new Error(
-              "Horde failed (" +
-                ((hordeErr && hordeErr.message) || "error") +
-                "); Pollinations also failed (" +
-                ((err2 && err2.message) || "image did not load") +
-                "). Tap Generate image to retry."
-            );
-          }
-        } else {
-          throw err;
-        }
+        },
+      });
+
+      if (!result || !result.ok || !result.chatUrl) {
+        throw new Error((result && result.error) || "Image Engine returned no image");
       }
 
-      if (!chatUrl) {
-        throw hordeErr || pollErr || new Error("No image returned");
-      }
-
+      const used = result.provider || "horde";
+      const chatUrl = result.chatUrl;
+      const mediaUrl = result.mediaUrl || result.chatUrl;
       const caption =
-        "Generated · " +
+        "Image Engine · " +
         parsed.mode +
         " · " +
         used +
@@ -2947,15 +3146,14 @@
         );
         renderMedia();
       } catch (_) {}
-      toast("Image ready (" + used + ")");
+      toast("Image Engine ready (" + used + ")");
     } catch (err) {
       const msg = (err && err.message) || "Image generation failed";
       toast(msg);
       const next = getAgentChat(chatMode);
       next.push({
         role: "assistant",
-        content:
-          "Couldn't generate that image. " + msg,
+        content: "Image Engine couldn't generate that. " + msg,
         ts: Date.now(),
       });
       setAgentChat(chatMode, next);
@@ -2968,11 +3166,97 @@
     }
   }
 
+  async function generateAgentVideo() {
+    if (state.agentLoading || state.genLoading) return;
+    const c = current();
+    if (!c) {
+      toast("Open a character first");
+      return;
+    }
+    const input = $("#agentInput");
+    let text = ((input && input.value) || "").trim();
+    if (!text) text = "short soft clip of the character";
+    const chatMode = getAgentMode();
+    const history = getAgentChat(chatMode);
+    history.push({ role: "user", content: text, ts: Date.now() });
+    setAgentChat(chatMode, history);
+    if (input) input.value = "";
+
+    state.agentLoading = true;
+    state.agentStatusText = "Video Engine · checking…";
+    syncAgentGenBtn();
+    renderAgentChat();
+
+    const aspect =
+      ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "9:16";
+    let parsed = { mode: "soft", scene: text };
+    try {
+      try {
+        const raw = await agentAskModeScene(text, c);
+        parsed = parseModeScene(raw, text);
+      } catch (_) {
+        parsed = parseModeScene("", text);
+      }
+
+      const result = await agentEngineVideo({
+        scene: parsed.scene,
+        mode: parsed.mode,
+        aspect,
+        character: c,
+        onStatus: (t) => {
+          state.agentStatusText = t;
+          renderAgentChat();
+        },
+      });
+
+      const reply =
+        (result && result.message) ||
+        "Video engine: free video isn’t available yet.";
+      const next = getAgentChat(chatMode);
+      next.push({
+        role: "assistant",
+        content: reply,
+        ts: Date.now(),
+      });
+      setAgentChat(chatMode, next);
+      try {
+        saveAgentVideoPendingToMedia(
+          getCharacter(c.id) || c,
+          "Video pending · " + parsed.mode + " · " + parsed.scene.slice(0, 36),
+          "Agent Video Engine stub. Scene: " + parsed.scene.slice(0, 200),
+          aspect,
+          parsed.mode
+        );
+        renderMedia();
+      } catch (_) {}
+      toast("Video Engine: free stub (pending note saved)");
+    } catch (err) {
+      const msg = (err && err.message) || "Video Engine failed";
+      toast(msg);
+      const next = getAgentChat(chatMode);
+      next.push({
+        role: "assistant",
+        content: "Video Engine: " + msg,
+        ts: Date.now(),
+      });
+      setAgentChat(chatMode, next);
+    } finally {
+      state.agentLoading = false;
+      state.agentStatusText = "";
+      syncAgentGenBtn();
+      renderAgentChat();
+    }
+  }
+
+
   async function sendAgentMessage() {
     if (state.agentLoading || state.genLoading) return;
     const input = $("#agentInput");
     const text = ((input && input.value) || "").trim();
     if (!text) return;
+    if (looksLikeVideoRequest(text)) {
+      return generateAgentVideo();
+    }
     if (looksLikeGenerateRequest(text)) {
       return generateAgentImage();
     }
@@ -3025,7 +3309,10 @@
     if (sendBtn) sendBtn.addEventListener("click", () => sendAgentMessage());
     const genBtn = $("#agentGenBtn");
     if (genBtn) genBtn.addEventListener("click", () => generateAgentImage());
+    const videoBtn = $("#agentVideoBtn");
+    if (videoBtn) videoBtn.addEventListener("click", () => generateAgentVideo());
     syncAgentGenBtn();
+    renderAgentEnginesPanel();
     const input = $("#agentInput");
     if (input) {
       input.addEventListener("keydown", (e) => {
