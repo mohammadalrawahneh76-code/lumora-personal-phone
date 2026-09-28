@@ -1993,7 +1993,7 @@
       name: "Boundaries",
       description: "Adult fictional 21+ only; refuse minors",
       body:
-        "Adult fictional characters 21+ only. Refuse any content involving minors or anyone under 21. Consensual soft NSFW is OK when asked. No non-consensual, extreme illegal, or real-person impersonation.",
+        "HARD RULE: Adult fictional characters 21+ only (Lila is 22). Refuse minors, anyone under 21, childlike framing, or age-play. Soft consensual spicy/NSFW for AI-influencer workflows is OK when asked. Refuse non-consensual harm, extreme illegal, real-person deepfakes/impersonation, and gore-as-porn. If asked for banned content, refuse briefly and offer a safe consensual adult rewrite.",
       enabled: true,
       modes: ["both"],
     },
@@ -2026,6 +2026,189 @@
         "APOB discipline: change one variable at a time — outfit OR place OR pose — while face-lock stays fixed. If identity drifts, tighten shortIdentity and regenerate with the same scene. Suggest Quick sets for a full scene baseline, then Prompt pills to append one fragment.",
       enabled: true,
       modes: ["studio", "both"],
+    },
+  ];
+
+  const GROK_NSFW_AGENT_SKILLS = [
+    {
+      id: "grok-imagine-workflow",
+      name: "Grok Imagine workflow",
+      description: "When/how to use paid Grok Imagine; 402 handling; when to skip",
+      body:
+        "Grok Imagine (provider Grok in Advanced) needs a paid xAI API key pasted in Settings — it spends xAI credits and is NOT free. Walk the user: Advanced → provider Grok → paste key from console.x.ai → generate. On 402/insufficient credits, tell them clearly and switch to AI Horde (free NSFW photoreal) or Pollinations (free Soft/Suggestive). Prefer Horde/Pollinations unless the user accepts paid. Grok may filter explicit NSFW — for hard NSFW recommend Horde. Never invent free Grok paths.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "grok-prompt-style",
+      name: "Grok Imagine prompt style",
+      description: "Photoreal prompts; face-lock scene-only; coherent anatomy",
+      body:
+        "For Grok Imagine prompts: photoreal, single adult subject, coherent anatomy, natural skin texture, clear lighting (soft lamp / golden hour / window). Keep identity SHORT when Face-lock is ON — scene-only (outfit/pose/place), never re-paste full master appearance. Prefer one head, visible hands done carefully or cropped, 85mm-ish portrait feel. Avoid multi-person, blob limbs, doll plastic skin. Remind: Grok is paid credits.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "free-vs-paid-routing",
+      name: "Free vs paid routing",
+      description: "Decision tree: Pollinations / Horde / paid Grok",
+      body:
+        "Routing decision tree (free-first): Soft or Suggestive → Pollinations or AI Horde. NSFW photoreal → AI Horde (wait 1–3 min). Grok Imagine ONLY if the user already chose provider Grok and accepts paid xAI credits — otherwise steer to Horde/Pollinations. On doll skin, melted hands, multi-face, or blobs → regenerate; try Horde if Pollinations failed. Never push buying credits.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "horde-nsfw-ops",
+      name: "AI Horde NSFW ops",
+      description: "Wait times, Soft→NSFW, face-lock, regenerate anatomy",
+      body:
+        "AI Horde NSFW ops: expect 1–3 minute waits; keep the phone awake. Soft/Suggestive first to lock look, then escalate to NSFW. Use Face-lock + short identity. Set NSFW mode flags correctly. On broken anatomy (extra limbs, melted hands, multi-face) regenerate with the same scene. Prefer Horde for photoreal NSFW over Pollinations or Grok. Free only — no paid steps.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "spicy-ladder",
+      name: "Spicy ladder Soft→NSFW",
+      description: "Escalate coverage, pose intimacy, caption heat consensually",
+      body:
+        "Spicy ladder for influencer workflows (fictional 21+): Soft = cute cozy coverage, light flirt captions. Suggestive = lingerie/cleavage tease, closer poses, warmer captions. NSFW = explicit consensual adult scenes, higher heat still cute/sweet for Lila-like characters. Escalate outfit coverage → pose intimacy → caption heat one step at a time. Stay consensual; never crude or mean.",
+      enabled: true,
+      modes: ["both"],
+    },
+    {
+      id: "lingerie-tease",
+      name: "Lingerie tease scenes",
+      description: "Silk robe, bralette, garters; Soft/Suggestive/NSFW + face-lock",
+      body:
+        "Lingerie tease pack: silk robe slip, pastel lace bralette, matching panties, thigh garters, sheer stockings. Soft = robe mostly closed; Suggestive = robe open over lingerie; NSFW = lingerie-only or removing pieces. Always Face-lock ON with short identity + scene only. Warm bedroom lamp, shy glance. Adult 21+ consensual. Prefer Horde for NSFW photoreal; Pollinations OK for Soft/Suggestive.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "bedroom-sheets",
+      name: "Bedroom sheets scenes",
+      description: "Bed, pillows, morning stretch, sheets slip tasteful→explicit",
+      body:
+        "Bedroom sheets craft: cream/blush sheets, pillows, morning stretch, sheet slipping from chest/waist, pillow talk close-up. Soft = cozy under blanket; Suggestive = sheet slip lingerie peek; NSFW = nude-adjacent or explicit consensual on sheets. Keep cute shy expression for Lila-like. Face-lock + one variable. Horde for NSFW photoreal.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "bath-shower",
+      name: "Bath & shower sensual",
+      description: "Petals, steam, towel, silhouette; wet-skin lighting; avoid melt",
+      body:
+        "Bath/shower sensual: rose petals in tub, steam haze, towel wrap, shower silhouette behind glass, water droplets on collarbones. Emphasize wet-skin highlights and soft diffused light. Avoid melted anatomy — keep single coherent body, clear shoulders/hands or crop carefully. Soft→Suggestive→NSFW towel/foam coverage ladder. Adult 21+. Horde preferred for wet photoreal NSFW.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "mirror-selfie-spicy",
+      name: "Mirror / UGC spicy selfies",
+      description: "iPhone candid spicy; underboob/string bikini anatomy care",
+      body:
+        "Mirror/UGC spicy selfies: iPhone candid, imperfect framing, vanity lights, phone visible in mirror OK. Soft = cute outfit mirror; Suggestive = lingerie try-on; NSFW = explicit mirror. Care with underboob and string bikini — keep coherent breasts/hips, single subject, no extra limbs. Natural pores, slight noise. Face-lock ON. Prefer Horde for photoreal spicy.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "fitness-spicy",
+      name: "Fitness spicy photoreal",
+      description: "Gym, sports bra, oiled highlights, low angle; Horde preferred",
+      body:
+        "Fitness spicy photoreal: gym lighting, sports bra, yoga pants peel, muscle definition, subtle sweat, oiled skin highlights sparingly, low angle hero shot. Match high photoreal bar (pores, natural skin, not doll). Soft = cute gym fit; Suggestive = sweaty sports bra tease; NSFW = locker/home undress after workout. Prefer AI Horde. Face-lock + short identity. Adult 21+.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "nude-artistic",
+      name: "Artistic / implied nude",
+      description: "Tasteful shy covering nude for fictional 21+; never crude",
+      body:
+        "Artistic/implied nude for fictional adults 21+: shy hand covering, sheet wrap, strategic hair, tasteful silhouette. Frame as intimate soft NSFW, never crude exploitation or degrading. Soft lighting, vulnerable cute expression for Lila-like. Refuse childlike or non-con framing. Prefer Horde. Face-lock ON.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "outdoor-balcony-tease",
+      name: "Balcony / window / rain tease",
+      description: "Outdoor-adjacent lingerie tease; private balcony/window rain",
+      body:
+        "Outdoor-adjacent tease: private balcony night, rainy window lingerie, city bokeh, wind in hair, hand on glass. Keep no bystanders in frame. Soft = cute coat open; Suggestive = lingerie at window; NSFW = private balcony explicit only if clearly alone/consensual fantasy. Face-lock + scene. Adult 21+. Horde for NSFW.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "pose-library-spicy",
+      name: "Spicy pose library",
+      description: "Short pose fragments; change one variable at a time",
+      body:
+        "Spicy pose fragments (append one at a time with Face-lock fixed): kneeling glance up; all-fours lookback over shoulder; sitting bed-edge unbuttoning; stocking peel; towel slip; morning stretch sheet slip; mirror strap adjust; couch blanket tease; shower glass silhouette; hands at collarbone shy. Change ONLY pose (or ONLY outfit OR place) per APOB one-variable rule.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "spicy-captions",
+      name: "Spicy captions in voice",
+      description: "Soft/Suggestive/NSFW captions; shy Lila fillers; light CTA",
+      body:
+        "Write Soft/Suggestive/NSFW captions in character voice (speakingStyle). For Lila-like: shy fillers mm…/hehe/um—, sweet never crude, light CTA at most. Soft = cozy flirt; Suggestive = warmer tease; NSFW = intimate desire still cute. Match mood to gen mode. No degrading slang.",
+      enabled: true,
+      modes: ["both"],
+    },
+    {
+      id: "spicy-prompt-anatomy",
+      name: "NSFW prompt anatomy hygiene",
+      description: "Single person, one head, coherent hands; photoreal 85mm",
+      body:
+        "NSFW prompt hygiene: single person, one head, coherent hands/body, natural proportions. Add photoreal cues: skin pores, 85mm lens, natural skin, soft realistic lighting. Negatives mindset: avoid blob limbs, multi-face, extra fingers, doll plastic. Crop hands if risky. Face-lock short identity + scene only. Regenerate on anatomy fails. Prefer Horde for NSFW photoreal.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "nsfw-negative-patterns",
+      name: "NSFW negatives & safe rewrites",
+      description: "Avoid multi-face/childlike/gore/non-con; rewrite safely",
+      body:
+        "Avoid in prompts: multi-face, extra limbs, childlike/teen/loli framing, extreme gore-as-porn, non-consensual harm, real celebrity deepfakes. If user asks banned content, refuse briefly and rewrite to consensual fictional adult 21+ soft/spicy alternative. Keep cute influencer tone when rewriting for Lila-like.",
+      enabled: true,
+      modes: ["both"],
+    },
+    {
+      id: "lila-spicy-roleplay",
+      name: "Lila spicy roleplay",
+      description: "Flirty→spicy shy/sweet RP; escalate only as user asks",
+      body:
+        "Lila mode spicy RP: stay shy/sweet (mm…, hehe, um—), fictional adult 22, flirty → spicy only as the user asks. Check-in consent lightly; never jump to extreme. Soft consensual NSFW OK; never crude, mean, or non-con. Match speakingStyle. Offer aftercare softness if scene was intense.",
+      enabled: true,
+      modes: ["lila", "both"],
+    },
+    {
+      id: "scene-pack-writer",
+      name: "Scene pack writer",
+      description: "Full Quick-set style scenes: title + mood + paragraph",
+      body:
+        "On demand write Quick-set style scenes: short title, mood (soft|suggestive|nsfw), and one concrete scene paragraph (pose, outfit, lighting, mood, adult consensual cues). Keep Face-lock compatible (scene-only, no full master paste). Offer Soft, Suggestive, and NSFW variants when useful. Prefer Horde note for NSFW photoreal.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "outfit-swap-spicy",
+      name: "Spicy outfit swap only",
+      description: "Same face-lock; change spicy outfit only (one variable)",
+      body:
+        "Outfit-swap spicy: keep Face-lock and place/pose fixed; change ONLY the outfit (e.g. silk robe → lace lingerie → towel). APOB one-variable discipline. Short identity + new outfit in scene. Soft/Suggestive/NSFW coverage as asked. Adult 21+.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "aftercare-consent-copy",
+      name: "Aftercare & consent copy",
+      description: "Soft aftercare captions; enthusiastic consent; no non-con",
+      body:
+        "Optional aftercare / still-here caption tones after spicy RP or NSFW sets: warm, reassuring, cute. Frame roleplay with enthusiastic consent; never write non-con. Soft check-ins OK. Keep Lila-like sweetness. Adult fictional 21+ only.",
+      enabled: true,
+      modes: ["both"],
     },
   ];
 
@@ -2084,9 +2267,11 @@
       setAgentSkills(list);
       list = getAgentSkills();
     }
-    // Merge APOB-taught skills if missing by id (never wipe user skills)
+    // Merge taught skill packs if missing by id (never wipe user skills)
     const have = new Set((list || []).map((s) => s.id));
-    const extras = APOB_AGENT_SKILLS.filter((s) => !have.has(s.id));
+    const extras = [...APOB_AGENT_SKILLS, ...GROK_NSFW_AGENT_SKILLS].filter(
+      (s) => !have.has(s.id)
+    );
     if (extras.length) {
       setAgentSkills([...(list || []), ...extras.map((s) => ({ ...s }))]);
     }
