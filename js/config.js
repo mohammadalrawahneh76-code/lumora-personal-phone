@@ -7,6 +7,7 @@ export const KEYS = {
   hordeKey: PREFIX + "horde_key",
   xaiKey: PREFIX + "xai_key",
   groqKey: PREFIX + "groq_key",
+  nvidiaKey: PREFIX + "nvidia_key",
   genProvider: PREFIX + "gen_provider",
   agentSkills: PREFIX + "agent_skills",
   hordeSoftSkillsV1: PREFIX + "horde_soft_skills_v1",
