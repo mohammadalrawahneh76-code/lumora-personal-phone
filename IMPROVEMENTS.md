@@ -21,7 +21,7 @@ Date: 2026-09-28 (Asia/Amman). Local smoke URL: `http://127.0.0.1:8765/`.
 ## Prioritized findings (remaining)
 
 ### P1 — maintainability
-- `js/app.js` is still ~5.5k lines (logic monolith). Next incremental extracts: `storage.js`, `generate/horde.js`, `agent/chat.js`, `ui/workspace.js`.
+- `js/app.js` is still chunked (~5.5k lines). Next incremental extracts: `storage.js`, `generate/bluesminds.js`, `agent/chat.js`, `ui/workspace.js`.
 - `style.css` (~50KB) could split into `css/base.css` + `workspace.css` + `agent.css` with multiple `<link>`s (avoid `@import` for perf).
 
 ### P2 — UX / mobile
@@ -39,7 +39,7 @@ Date: 2026-09-28 (Asia/Amman). Local smoke URL: `http://127.0.0.1:8765/`.
 - Compress / cache fonts; Unbounded + Fontshare are render-path critical.
 
 ### P5 — product decisions (human)
-- Whether to keep Pollinations as Soft/Suggestive fallback vs Horde-only.
+- Images and Agent chat are BluesMinds-only (Horde/Pollinations/Flux removed from active Generate paths).
 - Whether Agent “Video engine” stays a stub or gets a free path.
 - Whether to version `IMPROVEMENTS.md` into GitHub Issues.
 

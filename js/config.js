@@ -14,6 +14,7 @@ export const KEYS = {
   openrouterKey: PREFIX + "openrouter_key",
   bluesmindsKey: PREFIX + "bluesminds_key",
   bluesmindsModel: PREFIX + "bluesminds_model",
+  bluesmindsImageModel: PREFIX + "bluesminds_image_model",
   genProvider: PREFIX + "gen_provider",
   fluxModel: PREFIX + "flux_model",
   agentSkills: PREFIX + "agent_skills",
@@ -26,5 +27,6 @@ export const KEYS = {
   stealListSkillsV1: PREFIX + "steal_list_skills_v1",
   stealListSkillsV2: PREFIX + "steal_list_skills_v2",
   stealListSkillsV3: PREFIX + "steal_list_skills_v3",
+  bluesmindsImageSkillsV1: PREFIX + "bluesminds_image_skills_v1",
 };
 

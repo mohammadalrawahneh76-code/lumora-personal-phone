@@ -2,10 +2,10 @@
 export const STARTER_AGENT_SKILLS = [
   {
     id: "studio-image-quality",
-    name: "Image quality (free)",
-    description: "Prefer Horde for photoreal; Soft/Suggestive first; wait & regenerate",
+    name: "Image quality",
+    description: "BluesMinds images; Soft/Suggestive first; wait & regenerate",
     body:
-      "Soft/Suggestive without a real Horde key → Pollinations first (free). Soft/Suggestive with a Horde key, or NSFW → AI Horde (free photoreal, 1–3 min). Pollinations Soft/Suggestive fallback. Never fake success on blank/black frames. Free only — never suggest paid xAI Grok. Images = Pollinations + Horde only.",
+      "Images use BluesMinds only (same key as Agent chat; default gemini-2.5-flash-image). Soft/Suggestive first to lock look, then NSFW if needed. Never fake success on blank/black frames. Never suggest Horde, Pollinations, NVIDIA Flux, or paid xAI Grok as image backends.",
     enabled: true,
     modes: ["studio"],
   },
@@ -62,7 +62,7 @@ export const APOB_AGENT_SKILLS = [
     name: "UGC photoreal recipe",
     description: "Candid iPhone / pores / natural skin",
     body:
-      "For photoreal UGC quality (free Horde/Pollinations): recommend iPhone candid, raw photo pores, natural skin texture, imperfect framing, soft lamp or golden hour, slight noise. Fitness: sports bra, gym lighting, subtle sweat, oiled skin highlights sparingly. Prefer AI Horde for photoreal NSFW. Never push paid image APIs.",
+      "For photoreal UGC quality (BluesMinds images): recommend iPhone candid, raw photo pores, natural skin texture, imperfect framing, soft lamp or golden hour, slight noise. Fitness: sports bra, gym lighting, subtle sweat, oiled skin highlights sparingly. Soft→Suggestive→NSFW ladder. Images = BluesMinds only.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -84,7 +84,7 @@ export const AGENT_ENGINES_SKILLS = [
     name: "Agent engines",
     description: "Image generate + video stub — ask to generate",
     body:
-      "The Agent can generate images and attempt video. Image: free AI Horde first for Soft/Suggestive/NSFW, Pollinations Soft/Suggestive fallback, face-lock — ask “generate an image of…” or tap Generate image. Video (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent Generate image over opening Create → Generate when chatting. Never invent paid free video or claim Seedance works free.",
+      "The Agent can generate images and attempt video. Image: BluesMinds only (same key as chat), Soft/Suggestive/NSFW + face-lock — ask “generate an image of…” or tap Generate image. Video (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent Generate image over opening Create → Generate when chatting. Never invent paid free video or claim Seedance works free.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -94,9 +94,9 @@ export const STEAL_LIST_AGENT_SKILLS = [
   {
     id: "style-packs",
     name: "Style packs",
-    description: "Photoreal / Cinema / Anime Horde packs",
+    description: "Photoreal / Cinema / Anime style packs",
     body:
-      "Style packs (OurDream-style): Photoreal (default), Cinema, Anime. Each pack sets Horde model preference list + positive lead tags + negative extras. Style pack persists in localStorage (Photoreal default). Wire into buildHordePrompt / defaultHordeModels / Agent Image Engine. Free only — Horde + Pollinations. Prefer Photoreal for Lila UGC; Cinema for dramatic stills; Anime for illustration.",
+      "Style packs (OurDream-style): Photoreal (default), Cinema, Anime. Each pack sets positive lead tags + negative extras for BluesMinds image prompts. Style pack persists in localStorage (Photoreal default). Prefer Photoreal for Lila UGC; Cinema for dramatic stills; Anime for illustration. Images = BluesMinds only.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -105,16 +105,16 @@ export const STEAL_LIST_AGENT_SKILLS = [
     name: "Preset tiles",
     description: "One-tap scene presets with ETA chips",
     body:
-      "Preset tiles on Generate: Outfits, Poses/Scenes, Soft, Suggestive, NSFW (NSFW section only when NSFW mode is on). Each tile fills the scene box with a full prompt fragment and shows ~1–3 min · free Horde. Tap fills + highlights Generate; optional one-tap generate. Presets operate on the character Face-lock / identity — fictional adults 21+ only, never undress-of-real-stranger uploads.",
+      "Preset tiles on Generate: Outfits, Poses/Scenes, Soft, Suggestive, NSFW (NSFW section only when NSFW mode is on). Each tile fills the scene box with a full prompt fragment (BluesMinds images). Tap fills + highlights Generate; optional one-tap generate. Presets operate on the character Face-lock / identity — fictional adults 21+ only, never undress-of-real-stranger uploads.",
     enabled: true,
     modes: ["studio", "both"],
   },
   {
     id: "storyboard-set",
     name: "Storyboard set",
-    description: "Photo set 4–6 angle variants via Horde",
+    description: "Photo set 4–6 angle variants via BluesMinds",
     body:
-      "Storyboard / Photo set (4–6): take current scene → expand into front, 3/4, side, close-up, mirror, over-shoulder with Director framing. Queue Horde jobs sequentially with progress N/6; save each success into Media tagged storyboard. If Horde fails mid-set, keep completed frames and toast failures — never fake images. Free Horde only.",
+      "Storyboard / Photo set (4–6): take current scene → expand into front, 3/4, side, close-up, mirror, over-shoulder with Director framing. Queue BluesMinds image jobs sequentially with progress N/6; save each success into Media tagged storyboard. If a frame fails mid-set, keep completed frames and toast failures — never fake images.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -123,7 +123,7 @@ export const STEAL_LIST_AGENT_SKILLS = [
     name: "Agentic edit",
     description: "Rogue-style edit last image (outfit/light/angle)",
     body:
-      "Agentic edit (Rogue-style): when user says “change only the outfit to…”, “softer light”, “new angle”, or taps Apply edit, take the last successful still and rebuild a scene that keeps Face-lock identity fixed while applying ONLY that change. Run Image Engine (Horde Soft/Suggestive/NSFW from current mode, Pollinations Soft/Suggestive fallback). Never fake success — confirmAgentImage must pass. If no last still, ask them to generate an image first.",
+      "Agentic edit (Rogue-style): when user says “change only the outfit to…”, “softer light”, “new angle”, or taps Apply edit, take the last successful still and rebuild a scene that keeps Face-lock identity fixed while applying ONLY that change. Run Image Engine via BluesMinds (Soft/Suggestive/NSFW from current mode). Never fake success — confirmAgentImage must pass. If no last still, ask them to generate an image first.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -150,7 +150,7 @@ export const STEAL_LIST_AGENT_SKILLS = [
     name: "Hero face pack",
     description: "Pin 3–5 hero face stills; reinforce identity",
     body:
-      "Hero face pack (Rogue/APOB): user uploads/pins up to 5 hero face stills on the character (compressed ~640px JPEG in localStorage). Show thumbnails; set primary face-lock ref. When generating, reinforce shortIdentity + “match hero face pack” in the prompt. Prompt-only reinforcement this wave (no img2img unless a clean CORS-safe Horde source_image path already exists). Free only.",
+      "Hero face pack (Rogue/APOB): user uploads/pins up to 5 hero face stills on the character (compressed ~640px JPEG in localStorage). Show thumbnails; set primary face-lock ref. When generating, reinforce shortIdentity + “match hero face pack” in the prompt. Prompt-only reinforcement this wave. Images = BluesMinds only.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -159,7 +159,7 @@ export const STEAL_LIST_AGENT_SKILLS = [
     name: "Dress / try-on ref",
     description: "Outfit reference image → prompt transfer (Face-lock kept)",
     body:
-      "Dress from ref: user uploads/picks one outfit/style reference (compressed like hero pack). “Dress from ref” keeps Face-lock identity and transfers outfit vibe into the scene prompt (prompt-only — no paid virtual try-on API). Clear ref + thumbnail on Generate and Agent. Free Horde/Pollinations only.",
+      "Dress from ref: user uploads/picks one outfit/style reference (compressed like hero pack). “Dress from ref” keeps Face-lock identity and transfers outfit vibe into the scene prompt (prompt-only — no paid virtual try-on API). Clear ref + thumbnail on Generate and Agent. Images = BluesMinds only.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -186,7 +186,7 @@ export const STEAL_LIST_AGENT_SKILLS = [
     name: "Movie pack (6 scenes)",
     description: "GeneratePorn-style 6-beat checklist per character",
     body:
-      "Movie pack (6 scenes): builds a checklist of 6 related beats from current scene/theme (wide → medium → close → mirror → dialogue → soft close). Stored per character in localStorage. Each beat can Generate when tapped; track done/pending. Integrates with Checklist + Calendar idea stubs. Free Horde for stills.",
+      "Movie pack (6 scenes): builds a checklist of 6 related beats from current scene/theme (wide → medium → close → mirror → dialogue → soft close). Stored per character in localStorage. Each beat can Generate when tapped; track done/pending. Integrates with Checklist + Calendar idea stubs. Stills via BluesMinds.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -195,7 +195,7 @@ export const STEAL_LIST_AGENT_SKILLS = [
     name: "Queue meter",
     description: "Live queue/waiting/generating/verifying status",
     body:
-      "Queue meter: during generate / storyboard / agentic edit, show live status — queue position, waiting, generating, verifying, fetching. Persistent small meter on Generate + Agent (“Queue #3” / “Generating…” / “Verifying…”). Never label the meter “Horde:”. No fake coin currency. Free only.",
+      "Queue meter: during generate / storyboard / agentic edit, show live status — queue position, waiting, generating, verifying, fetching. Persistent small meter on Generate + Agent (“Queue #3” / “Generating…” / “Verifying…”). Never label the meter with old provider names (Horde). No fake coin currency.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -205,9 +205,9 @@ export const GROK_NSFW_AGENT_SKILLS = [
   {
     id: "bluesminds-agent-chat",
     name: "BluesMinds Agent chat",
-    description: "BluesMinds key for Agent text; images stay Horde/Pollinations",
+    description: "BluesMinds key for Agent chat + Generate images",
     body:
-      "Agent text chat uses BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Default model gemma-4-26b unless they change it. Images NEVER use BluesMinds or paid xAI Grok — Soft/Suggestive without a Horde key = Pollinations first; NSFW / keyed Horde = AI Horde; Pollinations Soft/Suggestive fallback. Never suggest paid xAI Grok Imagine.",
+      "Agent chat and Generate images both use BluesMinds (api.bluesminds.com) with the key the user stores in Agent → Chat. Chat default gemma-4-26b; image default gemini-2.5-flash-image (overridable). Never suggest Horde, Pollinations, NVIDIA Flux, or paid xAI Grok Imagine as backends.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -216,25 +216,25 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Pro prompt style",
     description: "Photoreal prompts; face-lock scene-only; coherent anatomy",
     body:
-      "For strong photoreal prompts (Horde/Pollinations): single adult subject, coherent anatomy, natural skin texture, clear lighting (soft lamp / golden hour / window). Keep identity SHORT when Face-lock is ON — scene-only (outfit/pose/place), never re-paste full master appearance. Prefer one head, visible hands done carefully or cropped, 85mm-ish portrait feel. Avoid multi-person, blob limbs, doll plastic skin. Free image paths only.",
+      "For strong photoreal prompts (BluesMinds): single adult subject, coherent anatomy, natural skin texture, clear lighting (soft lamp / golden hour / window). Keep identity SHORT when Face-lock is ON — scene-only (outfit/pose/place), never re-paste full master appearance. Prefer one head, visible hands done carefully or cropped, 85mm-ish portrait feel. Avoid multi-person, blob limbs, doll plastic skin.",
     enabled: true,
     modes: ["studio", "both"],
   },
   {
     id: "free-vs-paid-routing",
-    name: "Free image routing",
-    description: "Decision tree: Horde-first Soft/Suggestive/NSFW / Pollinations fallback",
+    name: "BluesMinds image routing",
+    description: "BluesMinds only for Soft/Suggestive/NSFW images",
     body:
-      "Routing decision tree (free-only images): Soft/Suggestive without a real Horde key → Pollinations first (Horde fallback). Soft/Suggestive with a Horde key or NSFW → AI Horde (wait 1–3 min). Never treat blank/black/censored frames as success. Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate. Agent chat text uses BluesMinds when keyed; that is not an image path.",
+      "All images go through BluesMinds (same key as Agent chat). Soft/Suggestive/NSFW modes only change the prompt ladder. Never treat blank/black/censored frames as success. Never suggest Horde, Pollinations, Flux, or paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate.",
     enabled: true,
     modes: ["studio", "both"],
   },
   {
     id: "horde-nsfw-ops",
-    name: "AI Horde NSFW ops",
-    description: "Wait times, Soft→NSFW, face-lock, regenerate anatomy",
+    name: "NSFW image ops",
+    description: "Soft→NSFW, face-lock, regenerate anatomy (BluesMinds)",
     body:
-      "AI Horde NSFW ops: expect 1–3 minute waits; keep the phone awake. Soft/Suggestive first to lock look, then escalate to NSFW. Use Face-lock + short identity. Set NSFW mode flags correctly. On broken anatomy (extra limbs, melted hands, multi-face) regenerate with the same scene. Prefer Horde for photoreal NSFW over Pollinations. Free only — no paid image steps.",
+      "NSFW image ops (BluesMinds): Soft/Suggestive first to lock look, then escalate to NSFW. Use Face-lock + short identity. Set NSFW mode flags correctly. On broken anatomy (extra limbs, melted hands, multi-face) regenerate with the same scene. Images = BluesMinds only.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -252,7 +252,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Lingerie tease scenes",
     description: "Silk robe, bralette, garters; Soft/Suggestive/NSFW + face-lock",
     body:
-      "Lingerie tease pack: silk robe slip, pastel lace bralette, matching panties, thigh garters, sheer stockings. Soft = robe mostly closed; Suggestive = robe open over lingerie; NSFW = lingerie-only or removing pieces. Always Face-lock ON with short identity + scene only. Warm bedroom lamp, shy glance. Adult 21+ consensual. Prefer Horde for Soft/Suggestive/NSFW photoreal; Pollinations only as Soft/Suggestive fallback.",
+      "Lingerie tease pack: silk robe slip, pastel lace bralette, matching panties, thigh garters, sheer stockings. Soft = robe mostly closed; Suggestive = robe open over lingerie; NSFW = lingerie-only or removing pieces. Always Face-lock ON with short identity + scene only. Warm bedroom lamp, shy glance. Adult 21+ consensual. Images via BluesMinds; Soft/Suggestive/NSFW ladder.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -261,7 +261,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Bedroom sheets scenes",
     description: "Bed, pillows, morning stretch, sheets slip tasteful→explicit",
     body:
-      "Bedroom sheets craft: cream/blush sheets, pillows, morning stretch, sheet slipping from chest/waist, pillow talk close-up. Soft = cozy under blanket; Suggestive = sheet slip lingerie peek; NSFW = nude-adjacent or explicit consensual on sheets. Keep cute shy expression for Lila-like. Face-lock + one variable. Horde for NSFW photoreal.",
+      "Bedroom sheets craft: cream/blush sheets, pillows, morning stretch, sheet slipping from chest/waist, pillow talk close-up. Soft = cozy under blanket; Suggestive = sheet slip lingerie peek; NSFW = nude-adjacent or explicit consensual on sheets. Keep cute shy expression for Lila-like. Face-lock + one variable. BluesMinds for NSFW photoreal.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -270,7 +270,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Bath & shower sensual",
     description: "Petals, steam, towel, silhouette; wet-skin lighting; avoid melt",
     body:
-      "Bath/shower sensual: rose petals in tub, steam haze, towel wrap, shower silhouette behind glass, water droplets on collarbones. Emphasize wet-skin highlights and soft diffused light. Avoid melted anatomy — keep single coherent body, clear shoulders/hands or crop carefully. Soft→Suggestive→NSFW towel/foam coverage ladder. Adult 21+. Horde preferred for wet photoreal NSFW.",
+      "Bath/shower sensual: rose petals in tub, steam haze, towel wrap, shower silhouette behind glass, water droplets on collarbones. Emphasize wet-skin highlights and soft diffused light. Avoid melted anatomy — keep single coherent body, clear shoulders/hands or crop carefully. Soft→Suggestive→NSFW towel/foam coverage ladder. Adult 21+. BluesMinds for wet photoreal NSFW.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -279,16 +279,16 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Mirror / UGC spicy selfies",
     description: "iPhone candid spicy; underboob/string bikini anatomy care",
     body:
-      "Mirror/UGC spicy selfies: iPhone candid, imperfect framing, vanity lights, phone visible in mirror OK. Soft = cute outfit mirror; Suggestive = lingerie try-on; NSFW = explicit mirror. Care with underboob and string bikini — keep coherent breasts/hips, single subject, no extra limbs. Natural pores, slight noise. Face-lock ON. Prefer Horde for photoreal spicy.",
+      "Mirror/UGC spicy selfies: iPhone candid, imperfect framing, vanity lights, phone visible in mirror OK. Soft = cute outfit mirror; Suggestive = lingerie try-on; NSFW = explicit mirror. Care with underboob and string bikini — keep coherent breasts/hips, single subject, no extra limbs. Natural pores, slight noise. Face-lock ON. BluesMinds for photoreal spicy.",
     enabled: true,
     modes: ["studio", "both"],
   },
   {
     id: "fitness-spicy",
     name: "Fitness spicy photoreal",
-    description: "Gym, sports bra, oiled highlights, low angle; Horde preferred",
+    description: "Gym, sports bra, oiled highlights, low angle; BluesMinds",
     body:
-      "Fitness spicy photoreal: gym lighting, sports bra, yoga pants peel, muscle definition, subtle sweat, oiled skin highlights sparingly, low angle hero shot. Match high photoreal bar (pores, natural skin, not doll). Soft = cute gym fit; Suggestive = sweaty sports bra tease; NSFW = locker/home undress after workout. Prefer AI Horde. Face-lock + short identity. Adult 21+.",
+      "Fitness spicy photoreal: gym lighting, sports bra, yoga pants peel, muscle definition, subtle sweat, oiled skin highlights sparingly, low angle hero shot. Match high photoreal bar (pores, natural skin, not doll). Soft = cute gym fit; Suggestive = sweaty sports bra tease; NSFW = locker/home undress after workout. BluesMinds images. Face-lock + short identity. Adult 21+.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -297,7 +297,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Artistic / implied nude",
     description: "Tasteful shy covering nude for fictional 21+; never crude",
     body:
-      "Artistic/implied nude for fictional adults 21+: shy hand covering, sheet wrap, strategic hair, tasteful silhouette. Frame as intimate soft NSFW, never crude exploitation or degrading. Soft lighting, vulnerable cute expression for Lila-like. Refuse childlike or non-con framing. Prefer Horde. Face-lock ON.",
+      "Artistic/implied nude for fictional adults 21+: shy hand covering, sheet wrap, strategic hair, tasteful silhouette. Frame as intimate soft NSFW, never crude exploitation or degrading. Soft lighting, vulnerable cute expression for Lila-like. Refuse childlike or non-con framing. BluesMinds images. Face-lock ON.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -306,7 +306,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Balcony / window / rain tease",
     description: "Outdoor-adjacent lingerie tease; private balcony/window rain",
     body:
-      "Outdoor-adjacent tease: private balcony night, rainy window lingerie, city bokeh, wind in hair, hand on glass. Keep no bystanders in frame. Soft = cute coat open; Suggestive = lingerie at window; NSFW = private balcony explicit only if clearly alone/consensual fantasy. Face-lock + scene. Adult 21+. Horde for NSFW.",
+      "Outdoor-adjacent tease: private balcony night, rainy window lingerie, city bokeh, wind in hair, hand on glass. Keep no bystanders in frame. Soft = cute coat open; Suggestive = lingerie at window; NSFW = private balcony explicit only if clearly alone/consensual fantasy. Face-lock + scene. Adult 21+. BluesMinds for NSFW.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -333,7 +333,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "NSFW prompt anatomy hygiene",
     description: "Single person, one head, coherent hands; photoreal 85mm",
     body:
-      "NSFW prompt hygiene: single person, one head, coherent hands/body, natural proportions. Add photoreal cues: skin pores, 85mm lens, natural skin, soft realistic lighting. Negatives mindset: avoid blob limbs, multi-face, extra fingers, doll plastic. Crop hands if risky. Face-lock short identity + scene only. Regenerate on anatomy fails. Prefer Horde for NSFW photoreal.",
+      "NSFW prompt hygiene: single person, one head, coherent hands/body, natural proportions. Add photoreal cues: skin pores, 85mm lens, natural skin, soft realistic lighting. Negatives mindset: avoid blob limbs, multi-face, extra fingers, doll plastic. Crop hands if risky. Face-lock short identity + scene only. Regenerate on anatomy fails. Prefer BluesMinds for NSFW photoreal.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -360,7 +360,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Scene pack writer",
     description: "Full Quick-set style scenes: title + mood + paragraph",
     body:
-      "On demand write Quick-set style scenes: short title, mood (soft|suggestive|nsfw), and one concrete scene paragraph (pose, outfit, lighting, mood, adult consensual cues). Keep Face-lock compatible (scene-only, no full master paste). Offer Soft, Suggestive, and NSFW variants when useful. Prefer Horde note for NSFW photoreal.",
+      "On demand write Quick-set style scenes: short title, mood (soft|suggestive|nsfw), and one concrete scene paragraph (pose, outfit, lighting, mood, adult consensual cues). Keep Face-lock compatible (scene-only, no full master paste). Offer Soft, Suggestive, and NSFW variants when useful. Note BluesMinds for NSFW photoreal.",
     enabled: true,
     modes: ["studio", "both"],
   },

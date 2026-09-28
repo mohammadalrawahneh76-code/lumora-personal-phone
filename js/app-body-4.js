@@ -376,36 +376,13 @@ function boot() {
   }
   const providerEl = $("#genProvider");
   {
-    let storedProvider = load(KEYS.genProvider, "") || "";
-    const initialMode = load(KEYS.genMode, "soft");
-    if (storedProvider === "grok") storedProvider = "horde";
-    // No provider picker: Flux if NIM key; Soft/Suggestive → Pollinations when anon Horde;
-    // NSFW or real Horde key → Horde. Avoids black/censored anon Horde frames on Soft.
-    const hasNvidia =
-      typeof getNvidiaKey === "function" ? !!getNvidiaKey() : !!(load(KEYS.nvidiaKey, "") || "");
-    const realHorde =
-      typeof hasRealHordeKey === "function" ? hasRealHordeKey() : false;
-    let initial;
-    if (storedProvider === "flux" && hasNvidia) {
-      initial = "flux";
-    } else if (initialMode === "nsfw" || (storedProvider === "horde" && realHorde)) {
-      initial = "horde";
-    } else if (!realHorde || storedProvider === "pollinations" || !storedProvider) {
-      initial = "pollinations";
-    } else {
-      initial = "horde";
-    }
     if (providerEl) {
-      providerEl.value = initial;
+      providerEl.value = "bluesminds";
       providerEl.addEventListener("change", () => {
-        setGenProvider(providerEl.value);
+        setGenProvider("bluesminds");
       });
     }
-    // Provider picker UI removed — silent Soft→Pollinations / NSFW→Horde default.
-    setGenProvider(initial);
-    if (typeof syncProviderForMode === "function") {
-      syncProviderForMode(initialMode === "nsfw" || initialMode === "suggestive" ? initialMode : "soft");
-    }
+    setGenProvider("bluesminds");
   }
   const fluxSeg = $("#genFluxModelSeg");
   if (fluxSeg && !fluxSeg.dataset.bound) {
@@ -423,10 +400,7 @@ function boot() {
   if (typeof syncFluxModelVisibility === "function") syncFluxModelVisibility();
   const useHordeBtn = $("#useHordeBtn");
   if (useHordeBtn) {
-    useHordeBtn.addEventListener("click", () => {
-      setGenProvider("horde");
-      toast("Using AI Horde for generation");
-    });
+    useHordeBtn.hidden = true;
   }
   const hordeKeyEl = $("#genHordeKey");
   if (hordeKeyEl) {

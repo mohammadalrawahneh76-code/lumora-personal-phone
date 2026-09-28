@@ -539,168 +539,47 @@ const AgentEngines = {
       }
       const imagePrompt = buildImagePrompt(c, scene, mode);
 
-      let hordeErr = null;
-      let pollErr = null;
-      let used = "horde";
-
-      // Prefer NVIDIA Flux when Generate provider is Flux + NIM key present
-      const wantFlux =
-        typeof getGenProvider === "function" &&
-        getGenProvider() === "flux" &&
-        typeof getNvidiaKey === "function" &&
-        !!getNvidiaKey() &&
-        typeof generateWithNvidiaFlux === "function";
-      // Soft/Suggestive + anon Horde key → Pollinations first (anon often returns black/censored)
-      const preferPollFirst =
-        mode !== "nsfw" &&
-        typeof hasRealHordeKey === "function" &&
-        !hasRealHordeKey();
-
-      if (wantFlux) {
-        try {
-          if (onStatus) onStatus("Image Engine · NVIDIA Flux…");
-          const rawFlux = await generateWithNvidiaFlux(imagePrompt, aspect, mode, {
-            onStatus: (t) => {
-              if (onStatus) onStatus("Image Engine · " + t);
-            },
-          });
-          if (onStatus) onStatus("Image Engine · verifying image…");
-          const confirmed = await confirmAgentImage(rawFlux);
-          return {
-            ok: true,
-            imageUrl: confirmed.chatUrl,
-            chatUrl: confirmed.chatUrl,
-            mediaUrl: confirmed.mediaUrl,
-            provider: "flux",
-            prompt: imagePrompt,
-            mode,
-            scene,
-          };
-        } catch (fluxErr) {
-          if (onStatus) {
-            onStatus(
-              "Image Engine · Flux failed — trying free backend (" +
-                ((fluxErr && fluxErr.message) || "error") +
-                ")…"
-            );
-          }
-        }
-      }
-
-      async function tryPollinations() {
-        used = "pollinations";
-        const pollUrl = buildPollinationsUrl(imagePrompt, aspect, mode);
-        if (pollUrl.length > 2200) {
-          throw new Error("Prompt too long for quick image path");
-        }
-        if (onStatus) onStatus("Image Engine · generating…");
-        const confirmed = await confirmAgentImage(pollUrl);
+      if (typeof getBluesmindsKey === "function" && !getBluesmindsKey()) {
         return {
-          ok: true,
-          imageUrl: confirmed.chatUrl,
-          chatUrl: confirmed.chatUrl,
-          mediaUrl: confirmed.mediaUrl,
-          provider: used,
+          ok: false,
+          error:
+            "Paste your BluesMinds key under Agent → Chat (same key for images).",
           prompt: imagePrompt,
           mode,
           scene,
+          provider: "bluesminds",
         };
       }
 
-      async function tryHorde() {
-        used = "horde";
-        if (onStatus) onStatus("Image Engine · queuing (free, 1–3 min)…");
-        const rawHorde = await generateWithHorde(imagePrompt, aspect, mode, {
+      try {
+        if (onStatus) onStatus("Image Engine · BluesMinds…");
+        const raw = await generateWithBluesminds(imagePrompt, aspect, mode, {
           onStatus: (t) => {
             if (onStatus) onStatus("Image Engine · " + t);
           },
         });
         if (onStatus) onStatus("Image Engine · verifying image…");
-        const confirmed = await confirmAgentImage(rawHorde);
+        const confirmed = await confirmAgentImage(raw);
         return {
           ok: true,
           imageUrl: confirmed.chatUrl,
           chatUrl: confirmed.chatUrl,
           mediaUrl: confirmed.mediaUrl,
-          provider: used,
+          provider: "bluesminds",
           prompt: imagePrompt,
           mode,
           scene,
         };
-      }
-
-      if (preferPollFirst) {
-        try {
-          return await tryPollinations();
-        } catch (err) {
-          pollErr = err;
-          if (onStatus) {
-            onStatus(
-              "Image Engine · quick path failed — trying queue (" +
-                ((err && err.message) || "error") +
-                ")…"
-            );
-          }
-          try {
-            return await tryHorde();
-          } catch (err2) {
-            hordeErr = err2;
-            return {
-              ok: false,
-              error:
-                "Couldn't generate an image (" +
-                ((pollErr && pollErr.message) || "quick path failed") +
-                "; " +
-                ((err2 && err2.message) || "queue failed") +
-                "). Soften the scene or try again.",
-              prompt: imagePrompt,
-              mode,
-              scene,
-              provider: used,
-            };
-          }
-        }
-      }
-
-      try {
-        return await tryHorde();
       } catch (err) {
-        hordeErr = err;
+        return {
+          ok: false,
+          error: (err && err.message) || "Image Engine failed",
+          prompt: imagePrompt,
+          mode,
+          scene,
+          provider: "bluesminds",
+        };
       }
-
-      // Soft/Suggestive: queue first, Pollinations fallback. NSFW stays on queue backend.
-      if (mode !== "nsfw") {
-        if (onStatus) {
-          onStatus("Image Engine · queue failed — trying free fallback…");
-        }
-        try {
-          return await tryPollinations();
-        } catch (err2) {
-          pollErr = err2;
-          return {
-            ok: false,
-            error:
-              "Couldn't generate an image (" +
-              ((hordeErr && hordeErr.message) || "queue failed") +
-              "; " +
-              ((err2 && err2.message) || "image did not load") +
-              "). Soften the scene or try again.",
-            prompt: imagePrompt,
-            mode,
-            scene,
-            provider: used,
-          };
-        }
-      }
-
-      return {
-        ok: false,
-        error: (hordeErr && hordeErr.message) || "Image Engine failed",
-        prompt: imagePrompt,
-        mode,
-        scene,
-        provider: "horde",
-      };
     },
   },
 
@@ -844,7 +723,7 @@ async function generateAgentImage() {
       throw new Error((result && result.error) || "Image Engine returned no image");
     }
 
-    const used = result.provider || "horde";
+    const used = result.provider || "bluesminds";
     const chatUrl = result.chatUrl;
     const mediaUrl = result.mediaUrl || result.chatUrl;
     const caption =
@@ -1104,6 +983,25 @@ function wireAgent() {
     };
     bmModelEl.addEventListener("change", persistBmModel);
     bmModelEl.addEventListener("blur", persistBmModel);
+  }
+  const bmImgModelEl = $("#agentBluesmindsImageModel");
+  if (bmImgModelEl && !bmImgModelEl.dataset.bound) {
+    bmImgModelEl.dataset.bound = "1";
+    const imgDef =
+      typeof BLUESMINDS_IMAGE_MODEL_DEFAULT !== "undefined"
+        ? BLUESMINDS_IMAGE_MODEL_DEFAULT
+        : "gemini-2.5-flash-image";
+    const storedImg =
+      (KEYS.bluesmindsImageModel && load(KEYS.bluesmindsImageModel, imgDef)) ||
+      imgDef;
+    bmImgModelEl.value = storedImg;
+    const persistBmImg = () => {
+      const v = bmImgModelEl.value.trim() || imgDef;
+      bmImgModelEl.value = v;
+      if (KEYS.bluesmindsImageModel) save(KEYS.bluesmindsImageModel, v);
+    };
+    bmImgModelEl.addEventListener("change", persistBmImg);
+    bmImgModelEl.addEventListener("blur", persistBmImg);
   }
 
   const input = $("#agentInput");

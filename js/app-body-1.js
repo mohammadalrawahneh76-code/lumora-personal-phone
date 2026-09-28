@@ -1142,23 +1142,12 @@ function setGenMode(mode) {
 }
 
 function getGenProvider() {
+  // BluesMinds is the sole image backend
   const el = $("#genProvider");
-  if (el && (el.value === "horde" || el.value === "pollinations" || el.value === "flux")) {
-    return el.value;
-  }
-  let v = load(KEYS.genProvider, "") || "";
-  // Migrate legacy paid Grok (xAI) image provider → Horde
-  if (v === "grok") {
-    v = "horde";
-    save(KEYS.genProvider, v);
-  }
-  // No stored preference: Soft path prefers Pollinations when anon Horde (often black/censored)
-  if (!v) {
-    v = hasRealHordeKey() ? "horde" : "pollinations";
-  }
-  if (v === "flux") return "flux";
-  if (v === "pollinations") return "pollinations";
-  return "horde";
+  if (el && el.value !== "bluesminds") el.value = "bluesminds";
+  const v = load(KEYS.genProvider, "") || "";
+  if (v !== "bluesminds") save(KEYS.genProvider, "bluesminds");
+  return "bluesminds";
 }
 
 /** Provider card UI removed — no-ops keep any lingering callers safe. */
@@ -1166,14 +1155,10 @@ function syncProviderCards(_provider) {}
 function syncChatEngineCards(_modelId) {}
 
 function setGenProvider(provider) {
-  const p =
-    provider === "flux" ? "flux" : provider === "horde" ? "horde" : "pollinations";
+  const p = "bluesminds";
   const el = $("#genProvider");
   if (el) el.value = p;
   save(KEYS.genProvider, p);
-  if (typeof syncHordeKeyVisibility === "function") syncHordeKeyVisibility();
-  if (typeof syncUseHordeBtn === "function") syncUseHordeBtn();
-  if (typeof syncFluxModelVisibility === "function") syncFluxModelVisibility();
   if (typeof updateGenProviderNote === "function") updateGenProviderNote(p);
   return p;
 }
@@ -1181,40 +1166,12 @@ function setGenProvider(provider) {
 
 function syncUseHordeBtn() {
   const btn = $("#useHordeBtn");
-  if (!btn) return;
-  const mode = getGenMode();
-  const provider = getGenProvider();
-  // Only nudge Horde when NSFW + Pollinations. Never when Flux is selected.
-  btn.hidden = !(mode === "nsfw" && provider === "pollinations");
+  if (btn) btn.hidden = true;
 }
 
-function syncProviderForMode(mode) {
-  const selected = getGenProvider();
-  // Keep explicit Flux (NVIDIA) across Soft/Suggestive/NSFW
-  if (selected === "flux") {
-    syncUseHordeBtn();
-    syncHordeKeyVisibility();
-    syncFluxModelVisibility();
-    return;
-  }
-  // NSFW forces Horde (Pollinations often filters)
-  if (mode === "nsfw") {
-    setGenProvider("horde");
-    return;
-  }
-  // Soft/Suggestive without a real Horde key → Pollinations (anon Horde often returns black/censored)
-  if (!hasRealHordeKey()) {
-    setGenProvider("pollinations");
-    return;
-  }
-  // Soft/Suggestive with a real Horde key: keep Horde unless user picked Pollinations
-  if (selected !== "pollinations") {
-    setGenProvider("horde");
-    return;
-  }
+function syncProviderForMode(_mode) {
+  setGenProvider("bluesminds");
   syncUseHordeBtn();
-  syncHordeKeyVisibility();
-  syncFluxModelVisibility();
 }
 
 function prepareGenPrompt(full, mode) {
@@ -1222,26 +1179,8 @@ function prepareGenPrompt(full, mode) {
   return full;
 }
 
-function resolveGenProvider(mode, imagePrompt) {
-  const selected = getGenProvider();
-  // NVIDIA Flux when selected + NIM key present (same nvapi- key as Agent chat)
-  if (selected === "flux") {
-    if (typeof getNvidiaKey === "function" && getNvidiaKey()) return "flux";
-    // no NIM key — fall through to Soft/NSFW defaults below
-  }
-  // NSFW always Horde (Pollinations filters)
-  if (mode === "nsfw") return "horde";
-
-  const len = (imagePrompt || "").length;
-  const enc = encodeURIComponent(imagePrompt || "").length;
-  const pollOk = len <= IMAGE_PROMPT_MAX && enc <= POLLINATIONS_URL_SAFE;
-
-  // Soft/Suggestive: Pollinations when no real Horde key, or when Pollinations was selected
-  if ((selected === "pollinations" || !hasRealHordeKey()) && pollOk) {
-    return "pollinations";
-  }
-  // Prompt too long for Pollinations, or user has a real Horde key → Horde
-  return "horde";
+function resolveGenProvider(_mode, _imagePrompt) {
+  return "bluesminds";
 }
 
 function buildPollinationsUrl(prompt, aspect, mode) {
@@ -1319,6 +1258,139 @@ function getBluesmindsModel() {
   return load(KEYS.bluesmindsModel, BLUESMINDS_MODEL_DEFAULT) || BLUESMINDS_MODEL_DEFAULT;
 }
 
+const BLUESMINDS_IMAGE_API = "https://api.bluesminds.com/v1/images/generations";
+const BLUESMINDS_IMAGE_MODEL_DEFAULT = "gemini-2.5-flash-image";
+
+function getBluesmindsImageModel() {
+  const el = $("#agentBluesmindsImageModel");
+  const fromInput = el ? el.value.trim() : "";
+  if (fromInput) return fromInput;
+  const stored =
+    (KEYS.bluesmindsImageModel && load(KEYS.bluesmindsImageModel, "")) || "";
+  return stored || BLUESMINDS_IMAGE_MODEL_DEFAULT;
+}
+
+/** Map Lumora aspects to OpenAI-compatible sizes BluesMinds accepts. */
+function bluesmindsAspectSize(aspect) {
+  switch (aspect) {
+    case "1:1":
+      return "1024x1024";
+    case "9:16":
+      return "1024x1536";
+    case "3:4":
+    default:
+      return "1024x1536";
+  }
+}
+
+/**
+ * BluesMinds OpenAI-compatible images/generations.
+ * Returns a data: URL or https URL suitable for preview / assertUsableGenImage.
+ */
+async function generateWithBluesminds(prompt, aspect, mode, opts) {
+  opts = opts || {};
+  const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
+  const key = typeof getBluesmindsKey === "function" ? getBluesmindsKey() : "";
+  if (!key) {
+    throw new Error(
+      "Paste your BluesMinds key under Agent → Chat (same key for images)."
+    );
+  }
+  const model = getBluesmindsImageModel();
+  const size = bluesmindsAspectSize(aspect);
+  const shaped = String(prompt || "").trim();
+  if (!shaped) throw new Error("Describe a scene first");
+
+  if (onStatus) onStatus("BluesMinds · generating…");
+
+  async function postOnce(includeSize) {
+    const payload = { model: model, prompt: shaped };
+    if (includeSize) payload.size = size;
+    let res;
+    try {
+      res = await fetch(BLUESMINDS_IMAGE_API, {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        headers: {
+          Authorization: "Bearer " + key,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      throw new Error(
+        (err && err.message) ||
+          "Could not reach BluesMinds images API (network or CORS)."
+      );
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const errObj = data && data.error;
+      const msg =
+        (errObj &&
+          (typeof errObj === "string"
+            ? errObj
+            : errObj.message || errObj.code)) ||
+        (data && (data.message || data.detail)) ||
+        "";
+      const textMsg = typeof msg === "string" ? msg : JSON.stringify(msg || "");
+      const err = new Error(textMsg || "BluesMinds image error (" + res.status + ")");
+      err.status = res.status;
+      err.body = textMsg;
+      throw err;
+    }
+    const item =
+      data && Array.isArray(data.data) && data.data.length ? data.data[0] : null;
+    if (!item) throw new Error("BluesMinds returned no image data");
+    if (item.b64_json) {
+      const b64 = String(item.b64_json).trim();
+      if (!b64) throw new Error("Empty BluesMinds b64_json");
+      // Assume PNG unless url hints otherwise — data URL works for preview
+      return "data:image/png;base64," + b64;
+    }
+    if (item.url) {
+      const u = String(item.url).trim();
+      if (!u) throw new Error("Empty BluesMinds image url");
+      return u;
+    }
+    throw new Error("BluesMinds response missing b64_json and url");
+  }
+
+  try {
+    return await postOnce(true);
+  } catch (err) {
+    const msg = String((err && err.message) || "");
+    const status = err && err.status;
+    // Size rejected or unsupported — retry without size
+    if (
+      status === 400 ||
+      /size|invalid|unsupported|not support/i.test(msg)
+    ) {
+      if (onStatus) onStatus("BluesMinds · retrying without size…");
+      return await postOnce(false);
+    }
+    if (status === 401 || status === 403) {
+      throw new Error(
+        "Invalid BluesMinds key — paste it under Agent → Chat (api.bluesminds.com/console/token)."
+      );
+    }
+    if (status === 429) {
+      throw new Error("BluesMinds rate limit — wait a moment and try again.");
+    }
+    if (status === 404 || /model|not found|deprecat/i.test(msg)) {
+      throw new Error(
+        "BluesMinds image model unavailable (" +
+          model +
+          ") — try gemini-2.5-flash-image."
+      );
+    }
+    throw err;
+  }
+}
+
+
 
 function getNvidiaKey() {
   const el = $("#agentNvidiaKey");
@@ -1363,7 +1435,7 @@ function nvidiaFetch(url, init) {
 function updateGenProviderNote(_provider) {
   const note = $("#genProviderNote");
   if (!note) return;
-  note.textContent = "Image generation uses the app’s default backend.";
+  note.textContent = "Images via BluesMinds (same key as Agent chat).";
 }
 
 function getFluxModelId() {
@@ -1397,9 +1469,9 @@ function setFluxModel(id) {
 
 function syncFluxModelVisibility() {
   const field = $("#genFluxModelField") || $("#genFluxModelSeg");
-  if (field) field.hidden = getGenProvider() !== "flux";
+  if (field) field.hidden = true;
   const hint = $("#genFluxHint");
-  if (hint) hint.hidden = getGenProvider() !== "flux";
+  if (hint) hint.hidden = true;
 }
 
 /** Snap to sizes NVIDIA Flux Schnell cloud API accepts. */
@@ -1996,11 +2068,22 @@ function softenGenFailToast(extra) {
   );
 }
 
-async function runHordeAndShow(imagePrompt, aspect, mode) {
+async function runBluesmindsAndShow(imagePrompt, aspect, mode) {
   prepareGenPreviewFrame();
   setGenLoading(true);
   try {
-    const url = await generateWithHorde(imagePrompt, aspect, mode);
+    if (typeof setHordeQueueStatus === "function") {
+      setHordeQueueStatus("BluesMinds · generating…");
+    }
+    const url = await generateWithBluesminds(imagePrompt, aspect, mode, {
+      onStatus: (t) => {
+        if (typeof setHordeQueueStatus === "function") setHordeQueueStatus(t);
+      },
+    });
+    if (typeof setHordeQueueStatus === "function") {
+      setHordeQueueStatus("Verifying image…");
+    }
+    await assertUsableGenImage(url);
     await showGenPreview(url, {
       allowHordeFallback: false,
       imagePrompt,
@@ -2009,24 +2092,9 @@ async function runHordeAndShow(imagePrompt, aspect, mode) {
       timeoutMs: 90000,
     });
   } catch (err) {
-    // Soft/Suggestive: Pollinations fallback after queue/censored failure
-    if (mode !== "nsfw") {
-      toast("Primary backend failed — trying free fallback…");
-      const pollUrl = buildPollinationsUrl(imagePrompt, aspect, mode);
-      if (pollUrl.length <= 2200) {
-        await showGenPreview(pollUrl, {
-          allowHordeFallback: false,
-          imagePrompt,
-          aspect,
-          mode,
-          timeoutMs: 90000,
-          _triedPollAfterBlank: true,
-        });
-        return;
-      }
-    }
     setGenLoading(false);
     state.lastGenUrl = null;
+    if (typeof clearHordeQueueStatus === "function") clearHordeQueueStatus();
     toast((err && err.message) || "Image generation failed");
   }
 }
@@ -2079,38 +2147,6 @@ function showGenPreview(url, opts) {
 
     const failToHordeOrToast = async () => {
       clearTimeout(timeout);
-      if (
-        opts.allowHordeFallback &&
-        opts.imagePrompt &&
-        !opts._triedHorde
-      ) {
-        opts._triedHorde = true;
-        toast("Retrying with free backend…");
-        try {
-          const hordeUrl = await generateWithHorde(
-            opts.imagePrompt,
-            opts.aspect,
-            opts.mode
-          );
-          setGenProvider("horde");
-          await showGenPreview(hordeUrl, {
-            allowHordeFallback: false,
-            timeoutMs: 90000,
-          });
-          finish();
-          return;
-        } catch (err) {
-          setGenLoading(false);
-          state.lastGenUrl = null;
-          img.hidden = true;
-          toast(
-            (err && err.message) ||
-              "Couldn't load the image. Soften the scene or try again."
-          );
-          finish();
-          return;
-        }
-      }
       setGenLoading(false);
       state.lastGenUrl = null;
       img.hidden = true;
@@ -2125,42 +2161,6 @@ function showGenPreview(url, opts) {
         succeed(candidate);
       } catch (err) {
         // Blank/black or invalid — do not leave Apply edit / Animate as a fake success
-        if (
-          opts.allowHordeFallback &&
-          opts.imagePrompt &&
-          !opts._triedHorde
-        ) {
-          await failToHordeOrToast();
-          return;
-        }
-        // Soft/Suggestive: try Pollinations once if this was a Horde/data URL fail
-        if (
-          !opts._triedPollAfterBlank &&
-          opts.imagePrompt &&
-          opts.mode !== "nsfw"
-        ) {
-          opts._triedPollAfterBlank = true;
-          const pollUrl = buildPollinationsUrl(
-            opts.imagePrompt,
-            opts.aspect,
-            opts.mode
-          );
-          if (pollUrl.length <= 2200) {
-            toast("Blank frame — trying free fallback…");
-            img.onload = async () => {
-              try {
-                await assertUsableGenImage(img.src || pollUrl);
-                succeed(img.src || pollUrl);
-              } catch (e2) {
-                failBlank((e2 && e2.message) || "Image came back empty.");
-              }
-            };
-            img.onerror = () =>
-              failBlank((err && err.message) || "Image came back empty.");
-            img.src = pollUrl;
-            return;
-          }
-        }
         failBlank((err && err.message) || "Image came back empty.");
       }
     };
@@ -2346,12 +2346,13 @@ async function runStoryboardSet() {
     toast("Storyboard " + (i + 1) + "/" + variants.length + " · " + v.label);
     const imagePrompt = buildImagePrompt(c, v.scene, mode);
     try {
-      const url = await generateWithHorde(imagePrompt, aspect, mode, {
+      const url = await generateWithBluesminds(imagePrompt, aspect, mode, {
         onStatus: (t) => {
           setHordeQueueStatus(t);
           setStoryboardProgress(t + " · frame", i + 1, variants.length);
         },
       });
+      await assertUsableGenImage(url);
       saveStoryboardFrameToMedia(
         getCharacter(c.id) || c,
         url,
@@ -2415,23 +2416,8 @@ async function runStoryboardSet() {
 
 
 async function runFluxAndShow(imagePrompt, aspect, mode) {
-  prepareGenPreviewFrame();
-  setGenLoading(true);
-  try {
-    const url = await generateWithNvidiaFlux(imagePrompt, aspect, mode, {
-      onStatus: (t) => {
-        if (typeof setHordeQueueStatus === "function") setHordeQueueStatus(t);
-      },
-    });
-    await showGenPreview(url, { allowHordeFallback: false, timeoutMs: 90000 });
-  } catch (err) {
-    toast(
-      "Flux failed (" +
-        ((err && err.message) || "error") +
-        ") — trying Horde…"
-    );
-    await runHordeAndShow(imagePrompt, aspect, mode);
-  }
+  // Flux path retired — BluesMinds only
+  await runBluesmindsAndShow(imagePrompt, aspect, mode);
 }
 
 async function generateSceneImage() {
@@ -2445,60 +2431,28 @@ async function generateSceneImage() {
     $("#sceneInput").focus();
     return;
   }
+  if (typeof getBluesmindsKey === "function" && !getBluesmindsKey()) {
+    toast("Paste your BluesMinds key under Agent → Chat (same key for images).");
+    return;
+  }
   const aspect = ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "3:4";
   const mode = getGenMode();
   const imagePrompt = buildImagePrompt(c, scene, mode);
   updateFullPreview();
-
-  let provider = resolveGenProvider(mode, imagePrompt);
-  if (getGenProvider() === "flux" && provider !== "flux") {
-    toast("Using default image backend…");
-  }
-  if (provider === "horde" && getGenProvider() !== "horde" && getGenProvider() !== "flux") {
-    setGenProvider("horde");
-  }
-
-  if (provider === "flux") {
-    await runFluxAndShow(imagePrompt, aspect, mode);
-    return;
-  }
-
-  if (provider === "horde") {
-    await runHordeAndShow(imagePrompt, aspect, mode);
-    return;
-  }
-
-  const url = buildPollinationsUrl(imagePrompt, aspect, mode);
-  // Extra guard: Safari often fails on very long GET URLs
-  if (url.length > 2200) {
-    toast("Prompt too long for quick path — using queue backend…");
-    setGenProvider("horde");
-    await runHordeAndShow(imagePrompt, aspect, mode);
-    return;
-  }
-
-  await showGenPreview(url, {
-    allowHordeFallback: true,
-    imagePrompt,
-    aspect,
-    mode,
-    timeoutMs: 90000,
-  });
+  setGenProvider("bluesminds");
+  await runBluesmindsAndShow(imagePrompt, aspect, mode);
 }
 
 function syncHordeKeyVisibility() {
-  const provider = getGenProvider();
-  const onFlux = provider === "flux";
   const hordeField = $("#genHordeKeyField");
-  // Horde key/model are Horde-only; hide when Flux is active so UI matches selection
-  if (hordeField) hordeField.hidden = onFlux;
+  if (hordeField) hordeField.hidden = true;
   const modelField = $("#genModel");
   if (modelField) {
     const wrap = modelField.closest("label.field") || modelField.parentElement;
-    if (wrap) wrap.hidden = onFlux;
+    if (wrap) wrap.hidden = true;
   }
   syncUseHordeBtn();
-  syncFluxModelVisibility();
+  if (typeof syncFluxModelVisibility === "function") syncFluxModelVisibility();
 }
 
 // ——— Media ———

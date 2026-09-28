@@ -183,6 +183,65 @@ function ensureAgentSkills() {
     }
     save(KEYS.stealListSkillsV3, true);
   }
+  // One-shot: BluesMinds-only image routing copy on system skills
+  if (!load(KEYS.bluesmindsImageSkillsV1, false)) {
+    const canonBm = {};
+    [
+      ...STARTER_AGENT_SKILLS,
+      ...APOB_AGENT_SKILLS,
+      ...GROK_NSFW_AGENT_SKILLS,
+      ...AGENT_ENGINES_SKILLS,
+      ...STEAL_LIST_AGENT_SKILLS,
+    ].forEach((s) => {
+      if (s && s.id) canonBm[s.id] = s;
+    });
+    const refreshBm = [
+      "studio-image-quality",
+      "apob-ugc-photoreal",
+      "agent-engines",
+      "style-packs",
+      "preset-tiles",
+      "storyboard-set",
+      "agentic-edit",
+      "hero-face-pack",
+      "dress-ref",
+      "movie-pack",
+      "queue-meter",
+      "bluesminds-agent-chat",
+      "pro-prompt-style",
+      "free-vs-paid-routing",
+      "horde-nsfw-ops",
+      "lingerie-tease",
+      "bedroom-sheets",
+      "bath-shower",
+      "mirror-selfie-spicy",
+      "fitness-spicy",
+      "nude-artistic",
+      "outdoor-tease",
+      "quick-set-writer",
+    ];
+    let listBm = list || [];
+    const haveBm = new Set(listBm.map((s) => s.id));
+    if (!haveBm.has("bluesminds-agent-chat") && canonBm["bluesminds-agent-chat"]) {
+      listBm.push({ ...canonBm["bluesminds-agent-chat"] });
+    }
+    let changedBm = false;
+    listBm = listBm.map((s) => {
+      if (refreshBm.indexOf(s.id) >= 0 && canonBm[s.id]) {
+        changedBm = true;
+        return {
+          ...s,
+          name: canonBm[s.id].name,
+          description: canonBm[s.id].description,
+          body: canonBm[s.id].body,
+        };
+      }
+      return s;
+    });
+    if (changedBm || listBm.length !== (list || []).length) setAgentSkills(listBm);
+    list = listBm;
+    save(KEYS.bluesmindsImageSkillsV1, true);
+  }
 }
 function skillApplies(skill, mode) {
   if (!skill || skill.enabled === false) return false;
@@ -221,8 +280,8 @@ function buildStudioSystem(c) {
   return (
     "You are Lumora Personal's studio co-pilot on a phone web app. " +
     "Help with character bible, prompt craft, Soft/Suggestive/NSFW scene generation, " +
-    "AI Horde vs Pollinations (both free for images), captions, and calendar ideas. " +
-    "Agent chat uses BluesMinds. Image generation uses free Horde/Pollinations; video is an honest free stub. " +
+    "captions, and calendar ideas. " +
+    "Agent chat and image generation both use BluesMinds (same API key under Agent → Chat). Video is an honest free stub. " +
     "Never invent paid steps. Never suggest paid xAI Grok Imagine. " +
     "Be concise for mobile. Current character: " +
     name +
@@ -1020,7 +1079,7 @@ async function applyAgenticEdit(instruction, opts) {
           "Agentic edit · " +
           mode +
           " · " +
-          (result.provider || "horde") +
+          (result.provider || "bluesminds") +
           "\n" +
           instr.slice(0, 160),
         imageUrl: chatUrl,
@@ -1028,7 +1087,7 @@ async function applyAgenticEdit(instruction, opts) {
       });
       setAgentChat(chatMode, next);
     }
-    toast("Edit ready (" + (result.provider || "horde") + ")");
+    toast("Edit ready (" + (result.provider || "bluesminds") + ")");
     return { ok: true, chatUrl, mediaUrl, provider: result.provider };
   } catch (err) {
     const msg = (err && err.message) || "Agentic edit failed";
@@ -1419,6 +1478,6 @@ function removeHeroFace(id) {
 /**
  * Agent-owned engines — named capabilities the Agent invokes (front door).
  * Studio Generate tab can still work independently; Agent does not depend on opening it.
- * Free-only for Agent images: AI Horde + Pollinations. Agent text: Groq (free key) then Pollinations.
+ * BluesMinds for Agent chat + images. Video remains an honest free stub.
  */
 
