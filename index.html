@@ -345,10 +345,19 @@
             <button type="button" data-v="cinema">Cinema</button>
             <button type="button" data-v="anime">Anime</button>
           </div>
-          <div class="section-label">Preset tiles</div>
-          <div class="preset-tiles" id="quickSets" aria-label="One-tap scene presets"></div>
-          <div class="chips scroll-x" id="presets"></div>
+          <details class="gen-steal-group" id="presetsDirectorGroup">
+            <summary>Presets &amp; Director</summary>
+            <div class="gen-steal-body">
+              <div class="section-label">Preset tiles</div>
+              <div class="preset-tiles" id="quickSets" aria-label="One-tap scene presets"></div>
+              <div class="chips scroll-x" id="presets"></div>
+              <div class="prompt-pills director-pills" id="directorPills" aria-label="Director shot pills"></div>
+            </div>
+          </details>
           <textarea id="sceneInput" rows="3" maxlength="800" placeholder="Describe the scene, outfit and mood…"></textarea>
+          <details class="gen-steal-group" id="dressDuoGroup">
+            <summary>Dress &amp; Duo</summary>
+            <div class="gen-steal-body">
           <div class="dress-ref-box" id="dressRefBox">
             <div class="section-label">Dress / try-on ref</div>
             <p class="hint">Upload one outfit/style still (compressed locally). Dress from ref keeps Face-lock identity — prompt-only transfer, no paid try-on API.</p>
@@ -382,8 +391,9 @@
               </label>
             </div>
           </div>
+            </div>
+          </details>
           <div class="prompt-pills" id="promptPills" aria-label="Prompt fragment chips"></div>
-          <div class="prompt-pills director-pills" id="directorPills" aria-label="Director shot pills"></div>
           <div class="composer-row">
             <div class="seg" id="aspectSeg" role="radiogroup" aria-label="Format">
               <button type="button" class="on" data-v="3:4">Portrait</button>
@@ -399,7 +409,12 @@
           </div>
           <div class="horde-queue-meter" id="hordeQueueMeter" hidden aria-live="polite"></div>
           <p class="hint storyboard-hint" id="storyboardProgress" hidden></p>
-          <div class="movie-pack-panel" id="moviePackList"></div>
+          <details class="gen-steal-group" id="moviePackGroup">
+            <summary>Movie pack</summary>
+            <div class="gen-steal-body">
+              <div class="movie-pack-panel" id="moviePackList"></div>
+            </div>
+          </details>
           <div class="storyboard-grid" id="storyboardGrid" hidden></div>
           <div class="composer-row composer-row-mode">
             <div class="seg" id="modeSeg" role="radiogroup" aria-label="Content mode">
@@ -409,7 +424,7 @@
             </div>
             <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
           </div>
-          <p class="gen-api-note">Style packs + presets + Photo set + Movie pack. Dress ref + Duo cast + Director pills. After a still: Apply edit or Animate this (free video-pending stub). Face-lock + hero face pack. Horde queue meter live. Soft/Suggestive/NSFW → Horde first; Pollinations Soft/Suggestive fallback. Free only. Adult fictional 21+ only.</p>
+          <p class="gen-api-note">Free AI Horde first (Pollinations Soft/Suggestive fallback). Adult fictional 21+ only.</p>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
@@ -464,8 +479,8 @@
             <div class="agentic-edit-box" id="agenticEditBox">
               <input type="text" id="agenticEditInput" maxlength="240" placeholder="Edit last image… outfit / light / angle only" enterkeyhint="go" />
               <div class="agentic-edit-actions">
-                <button type="button" class="btn btn-ghost btn-sm" id="agenticEditBtn">Apply edit</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="animateStillBtn">Animate this</button>
+                <button type="button" class="btn btn-ghost agentic-action-btn" id="agenticEditBtn">Apply edit</button>
+                <button type="button" class="btn btn-ghost agentic-action-btn" id="animateStillBtn">Animate this</button>
               </div>
             </div>
           </div>
@@ -589,8 +604,8 @@
           <div class="agentic-edit-box agent-edit-row" id="agentEditBox">
             <input type="text" id="agentEditInput" maxlength="240" placeholder="Edit last image… change only the outfit to…" enterkeyhint="go" />
             <div class="agentic-edit-actions">
-              <button type="button" class="btn btn-ghost btn-sm" id="agentEditBtn">Apply edit</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="agentAnimateBtn">Animate this</button>
+              <button type="button" class="btn btn-ghost agentic-action-btn" id="agentEditBtn">Apply edit</button>
+              <button type="button" class="btn btn-ghost agentic-action-btn" id="agentAnimateBtn">Animate this</button>
             </div>
           </div>
           <div class="composer-row">
@@ -600,38 +615,43 @@
             <button type="button" class="btn btn-ghost btn-sm" id="agentClearBtn">Clear chat</button>
           </div>
           <div class="horde-queue-meter" id="agentHordeQueueMeter" hidden aria-live="polite"></div>
-          <div class="dress-ref-box agent-dress-ref" id="agentDressRefBox">
-            <div class="section-label">Dress / try-on ref</div>
-            <div class="toolbar" style="gap:8px;flex-wrap:wrap;align-items:center">
-              <label class="btn btn-ghost btn-sm hero-upload-label">Upload outfit
-                <input type="file" id="agentDressRefFile" accept="image/*" hidden />
-              </label>
-              <button type="button" class="btn btn-light btn-sm" id="agentDressRefApplyBtn">Dress from ref</button>
+          <details class="gen-steal-group" id="agentExtrasGroup">
+            <summary>Dress &amp; Duo <em>(also on Generate)</em></summary>
+            <div class="gen-steal-body">
+              <div class="dress-ref-box agent-dress-ref" id="agentDressRefBox">
+                <div class="section-label">Dress / try-on ref</div>
+                <div class="toolbar" style="gap:8px;flex-wrap:wrap;align-items:center">
+                  <label class="btn btn-ghost btn-sm hero-upload-label">Upload outfit
+                    <input type="file" id="agentDressRefFile" accept="image/*" hidden />
+                  </label>
+                  <button type="button" class="btn btn-light btn-sm" id="agentDressRefApplyBtn">Dress from ref</button>
+                </div>
+                <label class="field" style="margin-top:8px">
+                  <span class="label">Outfit vibe <em>optional</em></span>
+                  <input type="text" id="agentDressRefVibe" maxlength="200" placeholder="e.g. blush silk robe…" />
+                </label>
+                <div id="agentDressRefThumbWrap" class="dress-ref-thumb-wrap" hidden></div>
+              </div>
+              <div class="duo-cast-box" id="agentDuoCastBox">
+                <label class="toggle-row">
+                  <input type="checkbox" id="agentDuoCastEnabled" />
+                  <span>Duo / fantasy cast (2nd character)</span>
+                </label>
+                <div id="agentDuoCastFields" hidden>
+                  <label class="field"><span class="label">Pick saved character</span>
+                    <select id="agentDuoCastPick"></select>
+                  </label>
+                  <label class="field"><span class="label">Partner name</span>
+                    <input type="text" id="agentDuoCastName" maxlength="40" placeholder="e.g. Mira" />
+                  </label>
+                  <label class="field"><span class="label">Short identity</span>
+                    <textarea id="agentDuoCastIdentity" rows="2" maxlength="280" placeholder="Adult 21+, hair / eyes / vibe…"></textarea>
+                  </label>
+                </div>
+              </div>
             </div>
-            <label class="field" style="margin-top:8px">
-              <span class="label">Outfit vibe <em>optional</em></span>
-              <input type="text" id="agentDressRefVibe" maxlength="200" placeholder="e.g. blush silk robe…" />
-            </label>
-            <div id="agentDressRefThumbWrap" class="dress-ref-thumb-wrap" hidden></div>
-          </div>
-          <div class="duo-cast-box" id="agentDuoCastBox">
-            <label class="toggle-row">
-              <input type="checkbox" id="agentDuoCastEnabled" />
-              <span>Duo / fantasy cast (2nd character)</span>
-            </label>
-            <div id="agentDuoCastFields" hidden>
-              <label class="field"><span class="label">Pick saved character</span>
-                <select id="agentDuoCastPick"></select>
-              </label>
-              <label class="field"><span class="label">Partner name</span>
-                <input type="text" id="agentDuoCastName" maxlength="40" placeholder="e.g. Mira" />
-              </label>
-              <label class="field"><span class="label">Short identity</span>
-                <textarea id="agentDuoCastIdentity" rows="2" maxlength="280" placeholder="Adult 21+, hair / eyes / vibe…"></textarea>
-              </label>
-            </div>
-          </div>
-          <p class="hint agent-gen-hint">Agent engines: Chat · Image · Video stub · Agentic edit · Animate · Dress ref · Duo cast. Free only. Horde queue meter above.</p>
+          </details>
+          <p class="hint agent-gen-hint">Edit / animate last still · Engines below. Free only.</p>
         </div>
         <details class="agent-engines-box" id="agentEnginesDetails" open>
           <summary>Engines</summary>
@@ -644,7 +664,7 @@
           </div>
           <div id="agentSkillsList" class="card-list"></div>
         </details>
-        <p class="gen-api-note">Agent chat: free Groq (paste key in Engines) first, else Pollinations. Images: Horde + Pollinations only. Skills teach the agent; data stays in this browser. No paid xAI Grok.</p>
+        <p class="gen-api-note">Chat: free Groq (key in Engines) or Pollinations. Images: Horde + Pollinations. Data stays in this browser.</p>
       </div>
     </div>
   </section>

@@ -1170,7 +1170,7 @@
     "WAI-NSFW-illustrious-SDXL",
   ];
   const HORDE_NEGATIVE =
-    "extra faces, multiple heads, fused faces, melted skin, blob, amorphous, mutated, deformed, disfigured, bad anatomy, bad hands, extra limbs, duplicate, clone, watermark, text, logo, ugly, lowres, blurry, censored";
+    "extra faces, two heads, dual face, double face, stacked faces, face stuck on chest, face on torso, cloned face, duplicate face, multiple faces, multiple heads, fused faces, split face, mirrored face, second face, extra person, crowd, group shot, melted skin, blob, amorphous, mutated, deformed, disfigured, bad anatomy, bad hands, extra limbs, mutated neck, twisted neck, duplicate, clone, watermark, text, logo, ugly, lowres, blurry, censored";
 
   /** OurDream-style engine packs: Photoreal (default) / Cinema / Anime */
   const STYLE_PACKS = {
@@ -1180,9 +1180,9 @@
       modelsSoft: null, // filled below from HORDE_MODELS_SOFT
       modelsNsfw: null,
       leadSoft:
-        "photorealistic portrait, raw photo, natural skin texture, soft lighting, single person, looking at viewer, coherent anatomy, sharp focus, 85mm",
+        "photorealistic portrait, raw photo, natural skin texture, soft lighting, single adult woman, one head, one face only, coherent neck and shoulders, looking at viewer, coherent anatomy, sharp focus, 85mm",
       leadNsfw:
-        "photorealistic, raw photo, natural skin texture, skin pores, single adult woman, detailed face, coherent anatomy, one head, sharp focus, 85mm",
+        "photorealistic, raw photo, natural skin texture, skin pores, single adult woman, one head, one face only, coherent neck and shoulders, detailed face, coherent anatomy, sharp focus, 85mm",
       negativeExtra: "cartoon, anime, illustration, 3d render, plastic skin",
       clipSkip: 1,
     },
@@ -1216,9 +1216,9 @@
         "Photon",
       ],
       leadSoft:
-        "cinematic still, film grain, anamorphic lens flare, dramatic lighting, shallow depth of field, movie still, color graded, 35mm, single person, coherent anatomy",
+        "cinematic still, film grain, anamorphic lens flare, dramatic lighting, shallow depth of field, movie still, color graded, 35mm, single adult woman, one head, one face only, coherent neck and shoulders, coherent anatomy",
       leadNsfw:
-        "cinematic still, film grain, dramatic rim light, shallow DOF, movie still, adult scene, coherent anatomy, detailed face, 35mm, color graded",
+        "cinematic still, film grain, dramatic rim light, shallow DOF, movie still, adult scene, single adult woman, one head, one face only, coherent neck and shoulders, coherent anatomy, detailed face, 35mm, color graded",
       negativeExtra: "flat lighting, oversaturated, cartoon, anime, snapchat filter, selfie stick",
       clipSkip: 1,
     },
@@ -1241,9 +1241,9 @@
         "Babes",
       ],
       leadSoft:
-        "anime illustration, clean lineart, soft cel shading, detailed eyes, vibrant colors, single character, beautiful lighting",
+        "anime illustration, clean lineart, soft cel shading, detailed eyes, vibrant colors, single character, one head, one face only, coherent neck and shoulders, beautiful lighting",
       leadNsfw:
-        "anime illustration, detailed eyes, soft shading, adult content, coherent anatomy, single character, beautiful lighting",
+        "anime illustration, detailed eyes, soft shading, adult content, coherent anatomy, single character, one head, one face only, coherent neck and shoulders, beautiful lighting",
       negativeExtra: "photorealistic, raw photo, 3d render, western cartoon, ugly face, extra limbs",
       clipSkip: 2,
     },
@@ -1285,15 +1285,54 @@
   function buildHordePrompt(imagePrompt, mode) {
     const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
     const pack = getStylePack();
-    const lead = m === "nsfw" ? pack.leadNsfw : pack.leadSoft;
+    let lead = m === "nsfw" ? pack.leadNsfw : pack.leadSoft;
+    const duoOn = isDuoCastEnabled();
+    // Duo: drop single-subject lock so two adults can appear. Solo: reinforce one face/head.
+    if (duoOn) {
+      lead = String(lead || "")
+        .replace(/\bsingle adult woman\b/gi, "two adult characters")
+        .replace(/\bsingle person\b/gi, "two people")
+        .replace(/\bsingle character\b/gi, "two characters")
+        .replace(/\bone head, one face only,?\s*/gi, "")
+        .replace(/\bcoherent neck and shoulders,?\s*/gi, "");
+      lead = (lead + ", two distinct adults, two separate faces, clear necks and shoulders").replace(/,\s*,+/g, ", ").trim();
+    } else {
+      const lock = "single adult woman, one head, one face only, coherent neck and shoulders";
+      if (!/one face only/i.test(lead)) lead = lock + ", " + lead;
+    }
     let positive = lead + ", " + String(imagePrompt || "").replace(/\s+/g, " ").trim();
     // Cap positive before negative so total stays reasonable for workers
     const maxPos = 1400;
     if (positive.length > maxPos) {
       positive = positive.slice(0, maxPos).replace(/\s+\S*$/, "") + "…";
     }
+    let neg = HORDE_NEGATIVE;
+    if (duoOn) {
+      // Allow two people; still ban stacked/cloned/extra faces beyond two
+      neg = neg
+        .replace(/\bextra person,\s*/gi, "")
+        .replace(/\bcrowd,\s*/gi, "")
+        .replace(/\bgroup shot,\s*/gi, "");
+      neg += ", three people, crowd, group shot, third face, extra faces beyond two, fused couple, merged bodies";
+    } else {
+      neg += ", multiple people, two people, couple, second person";
+    }
     const negExtra = pack.negativeExtra ? ", " + pack.negativeExtra : "";
-    return positive + " ### " + HORDE_NEGATIVE + negExtra;
+    return positive + " ### " + neg + negExtra;
+  }
+
+  function isDuoCastEnabled() {
+    try {
+      const ui =
+        ($("#duoCastEnabled") && $("#duoCastEnabled").checked) ||
+        ($("#agentDuoCastEnabled") && $("#agentDuoCastEnabled").checked);
+      if (ui) return true;
+      const c = typeof current === "function" ? current() : null;
+      const duo = c && getDuoCast(c);
+      return !!(duo && duo.enabled);
+    } catch (_) {
+      return false;
+    }
   }
 
   function mediaSrc(m) {
@@ -4752,6 +4791,8 @@
   function renderMoviePackUI(c) {
     const char = c || current();
     const pack = getMoviePack(char);
+    const movieGroup = $("#moviePackGroup");
+    if (movieGroup) movieGroup.open = !!pack;
     [$("#moviePackList"), $("#checklistMoviePack")].forEach((root) => {
       if (!root) return;
       if (!pack) {

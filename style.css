@@ -179,7 +179,7 @@ main:focus { outline: none; }
 .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding-block: 28px 40px; color: var(--faint); font-size: 0.82rem; border-top: 1px solid var(--line); }
 
 /* ---------- app views ---------- */
-.app-view { padding-top: calc(84px + env(safe-area-inset-top)); padding-bottom: 120px; min-height: 100svh; }
+.app-view { padding-top: calc(84px + env(safe-area-inset-top)); padding-bottom: max(120px, calc(24px + env(safe-area-inset-bottom) + 72px)); min-height: 100svh; }
 .row-between { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
 .back { color: var(--muted); font-size: 0.9rem; padding: 8px 0; margin-bottom: 8px; }
 .back:hover { color: var(--text); }
@@ -421,7 +421,19 @@ button.credits { cursor: pointer; }
 }
 .prompt-preview strong { color: var(--text); display: block; margin-bottom: 6px; font-family: var(--font-body); }
 
-.media-note-form { display: grid; gap: 12px; margin-top: 12px; }
+.media-note-form {
+  display: grid; gap: 12px; margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+#panel-generate .composer {
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+}
+.gen-preview {
+  margin-top: 14px;
+  margin-bottom: 4px;
+}
 .media-tile-note {
   aspect-ratio: 3/4; display: grid; place-content: center; text-align: center;
   padding: 16px; gap: 6px; color: var(--muted); font-size: 0.85rem;
@@ -480,7 +492,8 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
   padding: 0 12px; font: inherit;
 }
 .gen-api-note {
-  margin: 10px 0 0; font-size: 0.78rem; color: var(--muted); line-height: 1.45;
+  margin: 8px 0 0; font-size: 0.75rem; color: var(--muted); line-height: 1.4;
+  max-width: 62ch;
 }
 .gen-advanced {
   margin-top: 10px; border: 1px solid var(--line); border-radius: 10px;
@@ -505,9 +518,12 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
   position: relative; border-radius: var(--radius); overflow: hidden;
   border: 1px solid var(--line); background: var(--surface);
   max-width: min(100%, 420px);
+  max-height: min(52vh, 420px);
+  display: flex; align-items: center; justify-content: center;
 }
 .gen-preview-frame img {
-  display: block; width: 100%; height: auto; vertical-align: middle;
+  display: block; width: 100%; height: auto; max-height: min(52vh, 420px);
+  object-fit: contain; vertical-align: middle; background: #0a0a0b;
 }
 .gen-preview-skeleton {
   aspect-ratio: 3/4; display: grid; place-content: center;
@@ -906,12 +922,15 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 .agentic-edit-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
-  padding: 10px;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: rgba(255,255,255,0.03);
+  position: relative;
+  z-index: 2;
 }
 .agentic-edit-box input {
   width: 100%;
@@ -925,8 +944,31 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 }
 .agentic-edit-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 10px;
+  width: 100%;
+}
+.agentic-edit-actions .agentic-action-btn,
+.agentic-edit-actions .btn {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  position: relative;
+  z-index: 1;
+}
+@media (min-width: 481px) {
+  .agentic-edit-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .agentic-edit-actions .agentic-action-btn,
+  .agentic-edit-actions .btn {
+    flex: 1 1 calc(50% - 5px);
+    width: auto;
+    min-width: 140px;
+  }
 }
 .agent-edit-row { margin-bottom: 8px; }
 .character-wizard {
@@ -1084,3 +1126,95 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
   font-size: 0.85rem;
 }
 .agent-dress-ref { margin-top: 10px; }
+
+
+/* Polish: steal-list declutter + safe touch */
+.gen-steal-group {
+  margin: 10px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  padding: 0 12px;
+}
+.gen-steal-group > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.gen-steal-group > summary::-webkit-details-marker { display: none; }
+.gen-steal-group > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--faint, #888);
+  transition: transform 0.15s ease;
+}
+.gen-steal-group[open] > summary::before { transform: rotate(90deg); }
+.gen-steal-group > summary em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--faint, #888);
+}
+.gen-steal-body {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+}
+.gen-steal-body .dress-ref-box,
+.gen-steal-body .duo-cast-box,
+.gen-steal-body .movie-pack-panel {
+  margin-top: 0;
+}
+.movie-pack-panel:empty { display: none; }
+#moviePackGroup:not([open]) .movie-pack-panel:empty { display: none; }
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.composer > .composer-row,
+.composer > .section-label,
+.composer > .face-lock-gen,
+.composer > textarea,
+.composer > .gen-steal-group,
+.composer > .prompt-pills,
+.composer > .horde-queue-meter,
+.composer > .gen-advanced,
+.composer > .gen-preview,
+.composer > .media-note-form,
+.composer > .gen-api-note,
+.composer > .storyboard-grid,
+.composer > .storyboard-hint {
+  margin-top: 0;
+}
+.composer-row { margin-top: 2px; }
+.agentic-action-btn {
+  min-height: 44px !important;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+}
+.agent-composer {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.agent-edit-row {
+  margin-bottom: 10px;
+}
+#panel-generate .sticky-cta,
+#panel-agent .agent-composer {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+@media (max-width: 480px) {
+  .composer-actions .btn {
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+  .btn-sm { min-height: 44px; }
+}
