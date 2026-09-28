@@ -32,7 +32,7 @@ index.html          # Views + workspace IA
 style.css           # Dark Lumora styles (mobile-first)
 js/
   app.js            # Chunked loader (app-body-1..4) — do not replace with a monolith
-  config.js         # localStorage keys + public Sentry DSN (PostHog placeholder)
+  config.js         # localStorage keys + public Sentry DSN + PostHog project key
   sentry-init.js    # Sentry browser init (CDN; before app.js)
   app-body-*.js     # App logic chunks
   starters/         # Lila Bloom starter
@@ -54,5 +54,5 @@ See `IMPROVEMENTS.md` for audit notes.
 ## Observability
 
 - **Sentry** (client errors): project `lumora-personal-phone` in org `lumora-i0`. Public browser DSN in `js/config.js` / `js/sentry-init.js`. Captures unhandled errors plus generate / storyboard / agentic-edit / animate failures.
-- **PostHog**: not wired — no PostHog MCP available. Add a public `phc_…` project key to `POSTHOG_KEY` in `js/config.js` and a CDN `posthog-js` snippet when ready (keep autocapture off).
+- **PostHog**: wired via CDN `array.js` + `js/posthog-init.js` (public `phc_` project key in `js/config.js`). Autocapture off; pageviews on.
 

@@ -14,7 +14,7 @@
       environment: /github\.io$/i.test(location.hostname)
         ? "production"
         : "local",
-      release: "lumora-personal-phone@" + (window.__LUMORA_RELEASE__ || "20260929a"),
+      release: "lumora-personal-phone@" + (window.__LUMORA_RELEASE__ || "20260929b"),
       tracesSampleRate: 0,
       sendDefaultPii: false,
       ignoreErrors: [
