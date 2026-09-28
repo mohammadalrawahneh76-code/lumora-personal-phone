@@ -494,12 +494,8 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 .gen-advanced-fields {
   display: grid; gap: 10px; grid-template-columns: 1fr 1fr; padding-bottom: 14px;
 }
-.gen-advanced-fields #genXaiKeyField,
 .gen-advanced-fields #genHordeKeyField {
   grid-column: 1 / -1;
-}
-.gen-grok-paid-hint {
-  display: block; margin: 6px 0 0; font-size: 0.78rem; color: var(--muted); line-height: 1.35;
 }
 @media (max-width: 520px) {
   .gen-advanced-fields { grid-template-columns: 1fr; }
@@ -735,7 +731,18 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
   background: rgba(52, 211, 153, 0.18);
   color: #34d399;
 }
-.agent-horde-key-row .agent-engine-detail a {
+.agent-groq-key-row {
+  flex-wrap: wrap;
+}
+.agent-groq-key-field {
+  flex: 1 1 100%;
+  margin: 4px 0 0;
+}
+.agent-groq-key-field input {
+  width: 100%;
+}
+.agent-horde-key-row .agent-engine-detail a,
+.agent-groq-key-row .agent-engine-detail a {
   color: var(--accent, #a78bfa);
   text-decoration: underline;
 }

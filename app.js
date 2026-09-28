@@ -12,9 +12,11 @@
     genMode: PREFIX + "gen_mode",
     hordeKey: PREFIX + "horde_key",
     xaiKey: PREFIX + "xai_key",
+    groqKey: PREFIX + "groq_key",
     genProvider: PREFIX + "gen_provider",
     agentSkills: PREFIX + "agent_skills",
     hordeSoftSkillsV1: PREFIX + "horde_soft_skills_v1",
+    groqSkillsV1: PREFIX + "groq_skills_v1",
     agentChatStudio: PREFIX + "agent_chat_studio",
     agentChatLila: PREFIX + "agent_chat_lila",
     agentMode: PREFIX + "agent_mode",
@@ -35,7 +37,6 @@
     objectUrls: [], // revoke on navigate
     lastGenUrl: null,
     genLoading: false,
-    grokNsfwWarned: false,
     agentLoading: false,
     agentStatusText: "",
   };
@@ -1049,8 +1050,13 @@
   const NSFW_LOCK = "Adult fictional 21+ characters only. Explicit NSFW allowed.";
   const HORDE_ANON_KEY = "0000000000";
   const HORDE_API = "https://stablehorde.net/api/v2";
-  const XAI_API = "https://api.x.ai/v1/images/generations";
-  const XAI_DEFAULT_MODEL = "grok-imagine-image-2.0";
+  const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
+  const GROQ_MODELS = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+  ];
   const IMAGE_PROMPT_MAX = 1400;
   const IMAGE_MASTER_SNIPPET = 400;
   const POLLINATIONS_URL_SAFE = 1800;
@@ -1152,16 +1158,21 @@
 
   function getGenProvider() {
     const el = $("#genProvider");
-    if (el && (el.value === "grok" || el.value === "horde" || el.value === "pollinations")) {
+    if (el && (el.value === "horde" || el.value === "pollinations")) {
       return el.value;
     }
-    const v = load(KEYS.genProvider, "horde") || "horde";
-    if (v === "grok" || v === "pollinations") return v;
+    let v = load(KEYS.genProvider, "horde") || "horde";
+    // Migrate legacy paid Grok (xAI) image provider → Horde
+    if (v === "grok") {
+      v = "horde";
+      save(KEYS.genProvider, v);
+    }
+    if (v === "pollinations") return "pollinations";
     return "horde";
   }
 
   function setGenProvider(provider) {
-    const p = provider === "grok" || provider === "horde" ? provider : "pollinations";
+    const p = provider === "horde" ? "horde" : "pollinations";
     const el = $("#genProvider");
     if (el) el.value = p;
     save(KEYS.genProvider, p);
@@ -1180,12 +1191,6 @@
 
   function syncProviderForMode(mode) {
     const selected = getGenProvider();
-    // Honor explicit Grok always
-    if (selected === "grok") {
-      syncUseHordeBtn();
-      syncHordeKeyVisibility();
-      return;
-    }
     // NSFW forces Horde (Pollinations often filters)
     if (mode === "nsfw") {
       setGenProvider("horde");
@@ -1207,7 +1212,6 @@
 
   function resolveGenProvider(mode, imagePrompt) {
     const selected = getGenProvider();
-    if (selected === "grok") return "grok";
     // Explicit Pollinations: honor for Soft/Suggestive; NSFW still forces Horde
     if (selected === "pollinations") {
       if (mode === "nsfw") return "horde";
@@ -1256,101 +1260,11 @@
     return stored || HORDE_ANON_KEY;
   }
 
-  function getXaiKey() {
-    const el = $("#genXaiKey");
+  function getGroqKey() {
+    const el = $("#agentGroqKey");
     const fromInput = el ? el.value.trim() : "";
     if (fromInput) return fromInput;
-    return load(KEYS.xaiKey, "") || "";
-  }
-
-  function mapGrokAspectRatio(aspect) {
-    if (aspect === "1:1" || aspect === "9:16" || aspect === "3:4") return aspect;
-    return "3:4";
-  }
-
-  const GROK_PAID_TOAST =
-    "Grok needs a paid xAI key — switch to Pollinations (free) or AI Horde (free NSFW).";
-
-  function grokErrorMessage(status, json) {
-    const err = json && json.error;
-    const msg =
-      (err && (typeof err === "string" ? err : err.message || err.code)) ||
-      (json && (json.message || json.detail)) ||
-      "";
-    const text = typeof msg === "string" ? msg : JSON.stringify(msg || "");
-    const lower = (text + " " + JSON.stringify(json || {})).toLowerCase();
-    if (
-      status === 402 ||
-      /payment|credits?|billing|insufficient.?funds|quota|prepaid|balance/i.test(lower)
-    ) {
-      return GROK_PAID_TOAST;
-    }
-    if (status === 401 || status === 403) {
-      return "Invalid xAI API key — check the key from console.x.ai.";
-    }
-    if (status === 429) {
-      return "xAI rate limit — wait a moment and try again.";
-    }
-    if (
-      /moderat|content.?filter|safety|refus|blocked|violat|inappropriate|nsfw|rejected/i.test(
-        lower
-      )
-    ) {
-      return "Grok filtered this content — try Soft/Suggestive, or use AI Horde for NSFW.";
-    }
-    if (status >= 500) {
-      return "xAI is temporarily unavailable (" + status + "). Try again shortly.";
-    }
-    return text || ("xAI error (" + status + ")");
-  }
-
-  async function generateWithGrok(prompt, aspect, mode) {
-    const key = getXaiKey();
-    if (!key) {
-      throw new Error(GROK_PAID_TOAST);
-    }
-    const modelEl = $("#genModel");
-    let model = modelEl ? modelEl.value.trim() : "";
-    if (!model || !model.startsWith("grok-")) {
-      model = XAI_DEFAULT_MODEL;
-    }
-    const body = {
-      model,
-      prompt,
-      n: 1,
-      aspect_ratio: mapGrokAspectRatio(aspect),
-      response_format: "b64_json",
-      quality: "low",
-    };
-    let res;
-    try {
-      res = await fetch(XAI_API, {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer " + key,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-    } catch (_) {
-      throw new Error("Could not reach xAI — check your connection and try again.");
-    }
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(grokErrorMessage(res.status, json));
-    }
-    const item = json.data && json.data[0];
-    if (!item) throw new Error("xAI returned no image.");
-    if (item.b64_json) {
-      const b64 = String(item.b64_json);
-      let mime = "image/jpeg";
-      if (b64.startsWith("iVBOR")) mime = "image/png";
-      else if (b64.startsWith("UklGR")) mime = "image/webp";
-      else if (b64.startsWith("/9j/")) mime = "image/jpeg";
-      return "data:" + mime + ";base64," + b64;
-    }
-    if (item.url) return item.url;
-    throw new Error("xAI returned no image data.");
+    return load(KEYS.groqKey, "") || "";
   }
 
   function sleep(ms) {
@@ -1818,29 +1732,6 @@
       setGenProvider("horde");
     }
 
-    if (provider === "grok") {
-      if (!getXaiKey()) {
-        toast(GROK_PAID_TOAST);
-        return;
-      }
-      if (mode === "nsfw" && !state.grokNsfwWarned) {
-        state.grokNsfwWarned = true;
-        toast("Grok may filter explicit NSFW — AI Horde is more reliable for that.");
-      }
-      prepareGenPreviewFrame();
-      setGenLoading(true);
-      try {
-        const url = await generateWithGrok(imagePrompt, aspect, mode);
-        await showGenPreview(url, { allowHordeFallback: false });
-      } catch (err) {
-        setGenLoading(false);
-        state.lastGenUrl = null;
-        const msg = (err && err.message) || "Grok Imagine generation failed";
-        toast(msg);
-      }
-      return;
-    }
-
     if (provider === "horde") {
       await runHordeAndShow(imagePrompt, aspect, mode);
       return;
@@ -1865,12 +1756,9 @@
   }
 
   function syncHordeKeyVisibility() {
-    const provider = getGenProvider();
     const hordeField = $("#genHordeKeyField");
-    const xaiField = $("#genXaiKeyField");
     // Always visible under Advanced so Soft users see the free key path
     if (hordeField) hordeField.hidden = false;
-    if (xaiField) xaiField.hidden = provider !== "grok";
     syncUseHordeBtn();
   }
 
@@ -2118,7 +2006,7 @@
       name: "Image quality (free)",
       description: "Prefer Horde for photoreal; Soft/Suggestive first; wait & regenerate",
       body:
-        "Soft/Suggestive/NSFW → AI Horde first (free photoreal). Pollinations is Soft/Suggestive fallback only. Wait 1–3 min for Horde. Regenerate broken anatomy. Free only — never suggest paid Grok credits or any paid API. Skip paid Grok Imagine unless the user already chose it knowing it costs credits.",
+        "Soft/Suggestive/NSFW → AI Horde first (free photoreal). Pollinations is Soft/Suggestive fallback only. Wait 1–3 min for Horde. Regenerate broken anatomy. Free only — never suggest paid xAI Grok or any paid image API. Images = Horde + Pollinations only.",
       enabled: true,
       modes: ["studio"],
     },
@@ -2175,7 +2063,7 @@
       name: "UGC photoreal recipe",
       description: "Candid iPhone / pores / natural skin",
       body:
-        "For photoreal UGC quality (free Horde/Pollinations): recommend iPhone candid, raw photo pores, natural skin texture, imperfect framing, soft lamp or golden hour, slight noise. Fitness: sports bra, gym lighting, subtle sweat, oiled skin highlights sparingly. Prefer AI Horde for photoreal NSFW. Never push paid Grok credits.",
+        "For photoreal UGC quality (free Horde/Pollinations): recommend iPhone candid, raw photo pores, natural skin texture, imperfect framing, soft lamp or golden hour, slight noise. Fitness: sports bra, gym lighting, subtle sweat, oiled skin highlights sparingly. Prefer AI Horde for photoreal NSFW. Never push paid image APIs.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2205,29 +2093,29 @@
 
   const GROK_NSFW_AGENT_SKILLS = [
     {
-      id: "grok-imagine-workflow",
-      name: "Grok Imagine workflow",
-      description: "When/how to use paid Grok Imagine; 402 handling; when to skip",
+      id: "groq-agent-chat",
+      name: "Groq Agent chat",
+      description: "Free Groq key for Agent text; images stay Horde/Pollinations",
       body:
-        "Grok Imagine (provider Grok in Advanced) needs a paid xAI API key pasted in Settings — it spends xAI credits and is NOT free. Walk the user: Advanced → provider Grok → paste key from console.x.ai → generate. On 402/insufficient credits, tell them clearly and switch to AI Horde (free Soft/Suggestive/NSFW photoreal) — Pollinations only as Soft/Suggestive fallback. Prefer Horde unless the user accepts paid. Grok may filter explicit NSFW — for hard NSFW recommend Horde. Never invent free Grok paths.",
+        "Agent text chat prefers free Groq (OpenAI-compatible) when the user pastes a key from console.groq.com/keys into Agent → Engines. Key stays in this browser only. If no Groq key, Agent falls back to free Pollinations text. Images NEVER use Groq or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine. Spell it Groq (inference) not Grok (xAI).",
       enabled: true,
       modes: ["studio", "both"],
     },
     {
-      id: "grok-prompt-style",
-      name: "Grok Imagine prompt style",
+      id: "pro-prompt-style",
+      name: "Pro prompt style",
       description: "Photoreal prompts; face-lock scene-only; coherent anatomy",
       body:
-        "For Grok Imagine prompts: photoreal, single adult subject, coherent anatomy, natural skin texture, clear lighting (soft lamp / golden hour / window). Keep identity SHORT when Face-lock is ON — scene-only (outfit/pose/place), never re-paste full master appearance. Prefer one head, visible hands done carefully or cropped, 85mm-ish portrait feel. Avoid multi-person, blob limbs, doll plastic skin. Remind: Grok is paid credits.",
+        "For strong photoreal prompts (Horde/Pollinations): single adult subject, coherent anatomy, natural skin texture, clear lighting (soft lamp / golden hour / window). Keep identity SHORT when Face-lock is ON — scene-only (outfit/pose/place), never re-paste full master appearance. Prefer one head, visible hands done carefully or cropped, 85mm-ish portrait feel. Avoid multi-person, blob limbs, doll plastic skin. Free image paths only.",
       enabled: true,
       modes: ["studio", "both"],
     },
     {
       id: "free-vs-paid-routing",
-      name: "Free vs paid routing",
-      description: "Decision tree: Horde-first Soft/Suggestive/NSFW / paid Grok",
+      name: "Free image routing",
+      description: "Decision tree: Horde-first Soft/Suggestive/NSFW / Pollinations fallback",
       body:
-        "Routing decision tree (free-first): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Grok Imagine ONLY if the user already chose provider Grok and accepts paid xAI credits — otherwise steer to Horde. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Never push buying credits.",
+        "Routing decision tree (free-only images): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Agent chat text may use free Groq if keyed; that is not an image provider.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2236,7 +2124,7 @@
       name: "AI Horde NSFW ops",
       description: "Wait times, Soft→NSFW, face-lock, regenerate anatomy",
       body:
-        "AI Horde NSFW ops: expect 1–3 minute waits; keep the phone awake. Soft/Suggestive first to lock look, then escalate to NSFW. Use Face-lock + short identity. Set NSFW mode flags correctly. On broken anatomy (extra limbs, melted hands, multi-face) regenerate with the same scene. Prefer Horde for photoreal NSFW over Pollinations or Grok. Free only — no paid steps.",
+        "AI Horde NSFW ops: expect 1–3 minute waits; keep the phone awake. Soft/Suggestive first to lock look, then escalate to NSFW. Use Face-lock + short identity. Set NSFW mode flags correctly. On broken anatomy (extra limbs, melted hands, multi-face) regenerate with the same scene. Prefer Horde for photoreal NSFW over Pollinations. Free only — no paid image steps.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2461,7 +2349,6 @@
       const refreshIds = [
         "studio-image-quality",
         "free-vs-paid-routing",
-        "grok-imagine-workflow",
         "lingerie-tease",
         "agent-engines",
       ];
@@ -2480,6 +2367,48 @@
       });
       if (changed) setAgentSkills(list);
       save(KEYS.hordeSoftSkillsV1, true);
+    }
+    // One-shot: Groq Agent chat + retire paid Grok Imagine skill bodies
+    if (!load(KEYS.groqSkillsV1, false)) {
+      const canon2 = {};
+      [...STARTER_AGENT_SKILLS, ...APOB_AGENT_SKILLS, ...GROK_NSFW_AGENT_SKILLS, ...AGENT_ENGINES_SKILLS].forEach(
+        (s) => {
+          if (s && s.id) canon2[s.id] = s;
+        }
+      );
+      const refreshIds2 = [
+        "studio-image-quality",
+        "apob-ugc-photoreal",
+        "free-vs-paid-routing",
+        "horde-nsfw-ops",
+        "groq-agent-chat",
+        "pro-prompt-style",
+        "agent-engines",
+      ];
+      // Drop legacy paid Grok Imagine skills by id; replace with new free ones if missing
+      let list2 = (list || []).filter(
+        (s) => s.id !== "grok-imagine-workflow" && s.id !== "grok-prompt-style"
+      );
+      const have2 = new Set(list2.map((s) => s.id));
+      ["groq-agent-chat", "pro-prompt-style"].forEach((id) => {
+        if (!have2.has(id) && canon2[id]) list2.push({ ...canon2[id] });
+      });
+      let changed2 = false;
+      list2 = list2.map((s) => {
+        if (refreshIds2.indexOf(s.id) >= 0 && canon2[s.id]) {
+          changed2 = true;
+          return {
+            ...s,
+            name: canon2[s.id].name,
+            description: canon2[s.id].description,
+            body: canon2[s.id].body,
+          };
+        }
+        return s;
+      });
+      setAgentSkills(list2);
+      list = list2;
+      save(KEYS.groqSkillsV1, true);
     }
   }
   function skillApplies(skill, mode) {
@@ -2520,8 +2449,8 @@
       "You are Lumora Personal's free studio co-pilot on a phone web app. " +
       "Help with character bible, prompt craft, Soft/Suggestive/NSFW scene generation, " +
       "AI Horde vs Pollinations (both free), captions, and calendar ideas. " +
-      "You own Agent Engines: Image Engine (ready, free Horde/Pollinations) and Video Engine (honest free stub — no Seedance/APOB-quality free video). " +
-      "Never invent paid steps or ask the user to buy credits. Skip paid Grok unless they already use it. " +
+      "You own Agent Engines: Image Engine (ready, free Horde/Pollinations), Video Engine (honest free stub), and Agent chat (free Groq when keyed, else Pollinations). " +
+      "Never invent paid steps or ask the user to buy credits. Never suggest paid xAI Grok Imagine. " +
       "Be concise for mobile. Current character: " +
       name +
       ". Adult fictional 21+ only."
@@ -2596,6 +2525,86 @@
       (data && data.text) ||
       ""
     );
+  }
+
+  function groqErrorMessage(status, json) {
+    const err = json && json.error;
+    const msg =
+      (err && (typeof err === "string" ? err : err.message || err.code)) ||
+      (json && (json.message || json.detail)) ||
+      "";
+    const text = typeof msg === "string" ? msg : JSON.stringify(msg || "");
+    if (status === 401 || status === 403) {
+      return "Invalid Groq API key — get a free key at console.groq.com/keys.";
+    }
+    if (status === 429) {
+      return "Groq rate limit — wait a moment, or Agent will try Pollinations fallback.";
+    }
+    if (status === 404 || /model|not found|deprecat/i.test(text)) {
+      return "Groq model unavailable — trying next free model…";
+    }
+    if (status >= 500) {
+      return "Groq is temporarily unavailable (" + status + ").";
+    }
+    return text || ("Groq error (" + status + ")");
+  }
+
+  async function callGroqChat(messages, model) {
+    const key = getGroqKey();
+    if (!key) {
+      throw new Error(
+        "Add a free Groq key in Agent → Engines (console.groq.com) — or chat uses Pollinations fallback."
+      );
+    }
+    const useModel = model || GROQ_MODELS[0];
+    let res;
+    try {
+      res = await fetch(GROQ_API, {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        headers: {
+          Authorization: "Bearer " + key,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: useModel,
+          messages: messages,
+          temperature: 0.7,
+        }),
+      });
+    } catch (err) {
+      throw new Error(
+        friendlyTextApiError(err, "Groq") ||
+          "Could not reach Groq (CORS or network) — Agent will try Pollinations fallback."
+      );
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(groqErrorMessage(res.status, data));
+    }
+    const text = extractChatContent(data);
+    if (!String(text).trim()) throw new Error("Empty Groq reply (" + useModel + ")");
+    return String(text).trim();
+  }
+
+  async function tryGroqChat(messages) {
+    const key = getGroqKey();
+    if (!key) return null;
+    const errors = [];
+    for (let i = 0; i < GROQ_MODELS.length; i++) {
+      try {
+        return await callGroqChat(messages, GROQ_MODELS[i]);
+      } catch (err) {
+        errors.push(err);
+        const msg = String((err && err.message) || "");
+        // Auth / missing key: don't burn through models
+        if (/Invalid Groq|Add a free Groq|401|403/i.test(msg) && !/model/i.test(msg)) {
+          throw err;
+        }
+      }
+    }
+    throw errors[errors.length - 1] || new Error("Groq failed");
   }
 
   async function callPollinationsChat(messages, model) {
@@ -2680,6 +2689,18 @@
     const c = current();
     const messages = buildAgentMessages(mode, userText, c);
     const errors = [];
+    // Prefer free Groq when keyed; else Pollinations chain
+    try {
+      const groqReply = await tryGroqChat(messages);
+      if (groqReply) return groqReply;
+    } catch (err) {
+      errors.push(err);
+      // Missing key is expected — fall through quietly to Pollinations
+      const msg = String((err && err.message) || "");
+      if (!/Add a free Groq key/i.test(msg)) {
+        // keep error for final throw if all fail
+      }
+    }
     const models = ["openai", "openai-fast", "mistral"];
     for (let i = 0; i < models.length; i++) {
       try {
@@ -2699,6 +2720,10 @@
       errors.push(err);
     }
     const last = errors[errors.length - 1];
+    const lastMsg = String((last && last.message) || "");
+    if (/Add a free Groq key/i.test(lastMsg) && errors.length === 1) {
+      throw new Error(lastMsg);
+    }
     throw new Error(
       friendlyTextApiError(last, "Agent text") ||
         "All text endpoints failed — try again in a moment."
@@ -2877,6 +2902,12 @@
       { role: "user", content: String(userText || "").slice(0, 800) },
     ];
     const errors = [];
+    try {
+      const groqReply = await tryGroqChat(messages);
+      if (groqReply) return groqReply;
+    } catch (err) {
+      errors.push(err);
+    }
     for (const model of ["openai", "openai-fast", "mistral"]) {
       try {
         return await callPollinationsChat(messages, model);
@@ -2934,7 +2965,7 @@
   /**
    * Agent-owned engines — named capabilities the Agent invokes (front door).
    * Studio Generate tab can still work independently; Agent does not depend on opening it.
-   * Free-only for Agent: AI Horde + Pollinations. Paid Grok Imagine is Studio-only / labeled paid.
+   * Free-only for Agent images: AI Horde + Pollinations. Agent text: Groq (free key) then Pollinations.
    */
   const AgentEngines = {
     image: {
@@ -3121,6 +3152,10 @@
     const keySaved = !!(hordeKey && hordeKey !== HORDE_ANON_KEY);
     const keyBadge = keySaved ? "saved" : "anon";
     const keyLabel = keySaved ? "saved" : "anonymous";
+    const groqKey = (typeof getGroqKey === "function" ? getGroqKey() : "") || "";
+    const groqReady = !!groqKey;
+    const groqBadge = groqReady ? "ready" : "anon";
+    const groqLabel = groqReady ? "ready" : "not set";
     const rows = items
       .map((eng) => {
         const ready = eng.status === "ready";
@@ -3144,6 +3179,26 @@
         );
       })
       .join("");
+    const groqRow =
+      '<div class="agent-engine-row agent-groq-key-row">' +
+      '<span class="agent-engine-name">Groq (Agent chat)</span>' +
+      '<span class="agent-engine-badge ' +
+      groqBadge +
+      '">' +
+      groqLabel +
+      "</span>" +
+      '<span class="agent-engine-detail">' +
+      (groqReady
+        ? "Groq: ready — free text LLM for Agent Send"
+        : "Groq: not set (Pollinations fallback)") +
+      " · " +
+      '<a href="https://console.groq.com/keys" target="_blank" rel="noopener">Get free key</a>' +
+      "</span>" +
+      '<label class="field agent-groq-key-field">' +
+      '<span class="label">Groq API key <em>free · browser only</em></span>' +
+      '<input type="password" id="agentGroqKey" maxlength="200" placeholder="Paste Groq API key" autocomplete="off" />' +
+      '<span class="hint">Free tier from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a> — not xAI Grok. Stored only in this browser.</span>' +
+      "</label></div>";
     const keyRow =
       '<div class="agent-engine-row agent-horde-key-row">' +
       '<span class="agent-engine-name">Horde key</span>' +
@@ -3156,7 +3211,37 @@
       "Set free Horde key in Generate → Advanced · " +
       '<a href="https://stablehorde.net/register" target="_blank" rel="noopener">Register (still $0)</a>' +
       "</span></div>";
-    el.innerHTML = rows + keyRow;
+    el.innerHTML = rows + groqRow + keyRow;
+    const groqInput = $("#agentGroqKey");
+    if (groqInput) {
+      const stored = load(KEYS.groqKey, "") || "";
+      if (stored && !groqInput.value) groqInput.value = stored;
+      const persist = () => {
+        const v = groqInput.value.trim();
+        const prev = load(KEYS.groqKey, "") || "";
+        save(KEYS.groqKey, v);
+        // Refresh badge only when readiness flips (avoid wiping the input mid-edit)
+        if (!!v !== !!prev) renderAgentEnginesPanel();
+        else {
+          const badge = el.querySelector(".agent-groq-key-row .agent-engine-badge");
+          const detail = el.querySelector(".agent-groq-key-row .agent-engine-detail");
+          if (badge) {
+            badge.className = "agent-engine-badge " + (v ? "ready" : "anon");
+            badge.textContent = v ? "ready" : "not set";
+          }
+          if (detail) {
+            const link =
+              ' · <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Get free key</a>';
+            detail.innerHTML =
+              (v
+                ? "Groq: ready — free text LLM for Agent Send"
+                : "Groq: not set (Pollinations fallback)") + link;
+          }
+        }
+      };
+      groqInput.addEventListener("change", persist);
+      groqInput.addEventListener("blur", persist);
+    }
   }
 
 
@@ -3868,12 +3953,13 @@
     });
     const providerEl = $("#genProvider");
     if (providerEl) {
-      const storedProvider = load(KEYS.genProvider, "horde") || "horde";
+      let storedProvider = load(KEYS.genProvider, "horde") || "horde";
       const initialMode = load(KEYS.genMode, "soft");
-      // Default Horde (free Soft-first). Honor Grok or explicit Pollinations.
+      // Migrate legacy paid Grok (xAI) → Horde; default Horde (free Soft-first)
       if (storedProvider === "grok") {
-        providerEl.value = "grok";
-      } else if (storedProvider === "pollinations" && initialMode !== "nsfw") {
+        storedProvider = "horde";
+      }
+      if (storedProvider === "pollinations" && initialMode !== "nsfw") {
         providerEl.value = "pollinations";
       } else {
         providerEl.value = "horde";
@@ -3900,17 +3986,6 @@
       };
       hordeKeyEl.addEventListener("change", persistHordeKey);
       hordeKeyEl.addEventListener("blur", persistHordeKey);
-    }
-    const xaiKeyEl = $("#genXaiKey");
-    if (xaiKeyEl) {
-      const storedXai = load(KEYS.xaiKey, "");
-      if (storedXai) xaiKeyEl.value = storedXai;
-      xaiKeyEl.addEventListener("change", () => {
-        save(KEYS.xaiKey, xaiKeyEl.value.trim());
-      });
-      xaiKeyEl.addEventListener("blur", () => {
-        save(KEYS.xaiKey, xaiKeyEl.value.trim());
-      });
     }
     setGenMode(load(KEYS.genMode, "soft"));
     syncHordeKeyVisibility();
