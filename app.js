@@ -36,6 +36,7 @@
     genLoading: false,
     grokNsfwWarned: false,
     agentLoading: false,
+    agentStatusText: "",
   };
 
   // ——— Starter: Lila Bloom ———
@@ -1475,12 +1476,31 @@
   function setGenLoading(on) {
     state.genLoading = !!on;
     const btn = $("#generateImageBtn");
-    if (!btn) return;
-    btn.disabled = !!on;
-    btn.classList.toggle("is-loading", !!on);
-    btn.textContent = on ? "Generating…" : "Generate image";
+    if (btn) {
+      btn.disabled = !!on;
+      btn.classList.toggle("is-loading", !!on);
+      btn.textContent = on ? "Generating…" : "Generate image";
+    }
     const sk = $("#genPreviewSkeleton");
     if (sk) sk.hidden = !on;
+    syncAgentGenBtn();
+  }
+
+  function syncAgentGenBtn() {
+    const btn = $("#agentGenBtn");
+    if (!btn) return;
+    const busy = !!(state.agentLoading || state.genLoading);
+    btn.disabled = busy;
+    btn.classList.toggle("is-loading", busy);
+    btn.textContent = busy && state.genLoading && !state.agentLoading
+      ? "Generating…"
+      : busy && state.agentLoading
+        ? (state.agentStatusText && /Queuing|Horde|Pollinations|Building/i.test(state.agentStatusText)
+            ? "Generating…"
+            : "Working…")
+        : "Generate image";
+    const sendBtn = $("#agentSendBtn");
+    if (sendBtn) sendBtn.disabled = !!state.agentLoading;
   }
 
   function prepareGenPreviewFrame() {
@@ -2415,27 +2435,40 @@
         '<div class="agent-empty">' +
         (mode === "lila"
           ? "Say hi — Lila will reply in character (free text)."
-          : "Ask for prompt help, captions, or generation tips.") +
+          : "Ask for prompt help, captions, generation tips, or tap Generate image.") +
         "</div>";
       return;
     }
     let html = msgs
       .map((m) => {
         const role = m.role === "user" ? "user" : "assistant";
+        const hasImg = !!(m.imageUrl && String(m.imageUrl).trim());
+        const imgHtml = hasImg
+          ? '<img class="agent-chat-img" src="' +
+            esc(m.imageUrl) +
+            '" alt="Generated" loading="lazy" referrerpolicy="no-referrer" />'
+          : "";
         return (
           '<div class="agent-bubble ' +
           role +
+          (hasImg ? " has-image" : "") +
           '">' +
-          esc(m.content) +
+          (m.content ? esc(m.content) : "") +
+          imgHtml +
           (m.ts
-            ? '<span class="agent-meta">' + esc(new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) + "</span>"
+            ? '<span class="agent-meta">' +
+              esc(new Date(m.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) +
+              "</span>"
             : "") +
           "</div>"
         );
       })
       .join("");
     if (state.agentLoading) {
-      html += '<div class="agent-bubble assistant typing">Thinking…</div>';
+      html +=
+        '<div class="agent-bubble assistant typing">' +
+        esc(state.agentStatusText || "Thinking…") +
+        "</div>";
     }
     box.innerHTML = html;
     box.scrollTop = box.scrollHeight;
@@ -2498,17 +2531,225 @@
     else dlg.setAttribute("open", "");
   }
 
-  async function sendAgentMessage() {
-    if (state.agentLoading) return;
+  function looksLikeGenerateRequest(text) {
+    return /\b(generat(e|ing)|draw|make\s+(me\s+)?(an?\s+)?(image|pic|picture|photo)|create\s+(an?\s+)?(image|pic|picture|photo)|paint|render\s+(an?\s+)?(image|scene))\b/i.test(
+      String(text || "")
+    );
+  }
+
+  function parseModeScene(raw, fallbackScene) {
+    const text = String(raw || "");
+    let mode = "soft";
+    let scene = String(fallbackScene || "").trim();
+    const modeMatch = text.match(/^\s*MODE\s*:\s*(soft|suggestive|nsfw)\s*$/im);
+    if (modeMatch) {
+      const m = modeMatch[1].toLowerCase();
+      mode = m === "suggestive" || m === "nsfw" ? m : "soft";
+    } else if (/\bnsfw\b|explicit|nude|naked/i.test(text + " " + fallbackScene)) {
+      mode = "nsfw";
+    } else if (/\bsuggestive\b|lingerie|tease/i.test(text + " " + fallbackScene)) {
+      mode = "suggestive";
+    }
+    const sceneMatch = text.match(/^\s*SCENE\s*:\s*(.+)$/im);
+    if (sceneMatch) {
+      scene = sceneMatch[1].trim().replace(/^["']|["']$/g, "");
+    }
+    if (!scene) scene = String(fallbackScene || "").trim() || "cozy indoor portrait, soft light";
+    return { mode: mode, scene: scene.slice(0, 500) };
+  }
+
+  async function agentAskModeScene(userText, c) {
+    const skills = buildSkillsBlock("studio");
+    const system =
+      "You write short image scene briefs for Lumora Personal (adult fictional 21+ only). " +
+      "Return ONLY two lines, nothing else — no intro, no markdown:\n" +
+      "MODE: soft|suggestive|nsfw\n" +
+      "SCENE: <short scene: outfit, pose, place only — no full identity, no name, no age dump>\n" +
+      "MODE guide: soft=clothed SFW aesthetic; suggestive=lingerie/tease; nsfw=explicit adult. " +
+      "Infer MODE from the user request. Keep SCENE under 40 words." +
+      (skills ? "\n\n" + skills : "") +
+      (c && c.name ? "\nCharacter in use: " + c.name + " (identity is face-locked elsewhere — do not restate face)." : "");
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: String(userText || "").slice(0, 800) },
+    ];
+    try {
+      return await callPollinationsChat(messages);
+    } catch (err) {
+      try {
+        return await callPollinationsGet(messages);
+      } catch (err2) {
+        throw new Error((err2 && err2.message) || (err && err.message) || "Prompt build failed");
+      }
+    }
+  }
+
+  function saveAgentGenToMedia(c, imageUrl, label, notes, aspect) {
+    if (!c || !imageUrl) return;
+    const media = [
+      {
+        id: uid("m"),
+        label: String(label || "Agent generation").slice(0, 80),
+        notes: String(notes || "").slice(0, 500),
+        aspect: aspect || "3:4",
+        imageDataUrl: null,
+        imageUrl: imageUrl,
+        createdAt: new Date().toISOString(),
+        source: "agent",
+      },
+      ...(c.media || []),
+    ];
+    updateCharacter(c.id, { media });
+  }
+
+  function lightUpdateGenPreview(url) {
+    const wrap = $("#genPreview");
+    const img = $("#genPreviewImg");
+    if (!wrap || !img || !url) return;
+    wrap.hidden = false;
+    try {
+      img.referrerPolicy = "no-referrer";
+    } catch (_) {}
+    img.hidden = false;
+    img.src = url;
+  }
+
+  async function generateAgentImage() {
+    if (state.agentLoading || state.genLoading) return;
+    const c = current();
+    if (!c) {
+      toast("Open a character first");
+      return;
+    }
     const input = $("#agentInput");
-    const text = (input && input.value || "").trim();
+    let text = ((input && input.value) || "").trim();
+    if (!text) {
+      toast("Describe the scene in the box first");
+      if (input) input.focus();
+      return;
+    }
+    const chatMode = getAgentMode();
+    const history = getAgentChat(chatMode);
+    history.push({ role: "user", content: text, ts: Date.now() });
+    setAgentChat(chatMode, history);
+    if (input) input.value = "";
+
+    state.agentLoading = true;
+    state.agentStatusText = "Building prompt…";
+    syncAgentGenBtn();
+    renderAgentChat();
+
+    const aspect =
+      ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "3:4";
+    let parsed = { mode: "soft", scene: text };
+
+    try {
+      try {
+        const raw = await agentAskModeScene(text, c);
+        parsed = parseModeScene(raw, text);
+      } catch (_) {
+        parsed = parseModeScene("", text);
+      }
+
+      state.agentStatusText = "Queuing AI Horde (free, 1–3 min)…";
+      renderAgentChat();
+      syncAgentGenBtn();
+
+      const imagePrompt = buildImagePrompt(c, parsed.scene, parsed.mode);
+      setGenLoading(true);
+
+      let imageUrl = null;
+      let used = "horde";
+      let lastErr = null;
+
+      try {
+        imageUrl = await generateWithHorde(imagePrompt, aspect, parsed.mode);
+      } catch (err) {
+        lastErr = err;
+        // Soft/Suggestive: Horde first for photoreal, Pollinations fallback. NSFW stays on Horde.
+        if (parsed.mode !== "nsfw") {
+          state.agentStatusText = "Horde busy — trying Pollinations (free)…";
+          renderAgentChat();
+          used = "pollinations";
+          const pollUrl = buildPollinationsUrl(imagePrompt, aspect, parsed.mode);
+          if (pollUrl.length > 2200) {
+            throw lastErr || new Error("Prompt too long for Pollinations fallback");
+          }
+          // Keep durable HTTPS URL for chat/media (blob URLs die on reload)
+          imageUrl = pollUrl;
+        } else {
+          throw err;
+        }
+      }
+
+      if (!imageUrl) {
+        throw lastErr || new Error("No image returned");
+      }
+
+      const caption =
+        "Generated · " +
+        parsed.mode +
+        " · " +
+        used +
+        "\n" +
+        parsed.scene.slice(0, 160);
+      const next = getAgentChat(chatMode);
+      next.push({
+        role: "assistant",
+        content: caption,
+        imageUrl: imageUrl,
+        ts: Date.now(),
+      });
+      setAgentChat(chatMode, next);
+      state.lastGenUrl = imageUrl;
+      lightUpdateGenPreview(imageUrl);
+      try {
+        saveAgentGenToMedia(
+          getCharacter(c.id) || c,
+          imageUrl,
+          "Agent · " + parsed.mode + " · " + parsed.scene.slice(0, 40),
+          parsed.scene,
+          aspect
+        );
+        renderMedia();
+      } catch (_) {}
+      toast("Image ready (" + used + ")");
+    } catch (err) {
+      const msg = (err && err.message) || "Image generation failed";
+      toast(msg + " — tap Generate image to retry");
+      const next = getAgentChat(chatMode);
+      next.push({
+        role: "assistant",
+        content:
+          "Couldn't generate that image. " + msg + " Tap Generate image to retry.",
+        ts: Date.now(),
+      });
+      setAgentChat(chatMode, next);
+    } finally {
+      state.agentLoading = false;
+      state.agentStatusText = "";
+      setGenLoading(false);
+      syncAgentGenBtn();
+      renderAgentChat();
+    }
+  }
+
+  async function sendAgentMessage() {
+    if (state.agentLoading || state.genLoading) return;
+    const input = $("#agentInput");
+    const text = ((input && input.value) || "").trim();
     if (!text) return;
+    if (looksLikeGenerateRequest(text)) {
+      return generateAgentImage();
+    }
     const mode = getAgentMode();
     const history = getAgentChat(mode);
     history.push({ role: "user", content: text, ts: Date.now() });
     setAgentChat(mode, history);
     if (input) input.value = "";
     state.agentLoading = true;
+    state.agentStatusText = "Thinking…";
+    syncAgentGenBtn();
     renderAgentChat();
     try {
       const reply = await agentAsk(text);
@@ -2519,6 +2760,8 @@
       toast((err && err.message) || "Agent failed — try again");
     } finally {
       state.agentLoading = false;
+      state.agentStatusText = "";
+      syncAgentGenBtn();
       renderAgentChat();
     }
   }
@@ -2538,6 +2781,9 @@
     }
     const sendBtn = $("#agentSendBtn");
     if (sendBtn) sendBtn.addEventListener("click", () => sendAgentMessage());
+    const genBtn = $("#agentGenBtn");
+    if (genBtn) genBtn.addEventListener("click", () => generateAgentImage());
+    syncAgentGenBtn();
     const input = $("#agentInput");
     if (input) {
       input.addEventListener("keydown", (e) => {

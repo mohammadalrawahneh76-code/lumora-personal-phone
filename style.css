@@ -658,3 +658,12 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 }
 .prompt-pill:active { transform: scale(0.96); background: rgba(255,255,255,0.08); }
 .prompt-pill.used { border-color: var(--accent, #c45b8c); color: var(--accent, #c45b8c); }
+
+.agent-gen-hint { margin: 8px 2px 0; font-size: 0.78rem; color: var(--muted); line-height: 1.35; }
+.agent-bubble .agent-chat-img {
+  display: block; max-width: 100%; width: 100%; height: auto;
+  border-radius: 12px; margin-top: 8px;
+  background: #0a0a0b;
+}
+.agent-bubble.assistant.has-image { max-width: 96%; }
+#agentGenBtn.is-loading { opacity: 0.7; pointer-events: none; }
