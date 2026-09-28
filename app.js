@@ -2488,7 +2488,7 @@
     const sceneEl = $("#sceneInput");
     if (sceneEl) sceneEl.value = t.scene;
     $$(".preset-tile").forEach((el) => el.classList.toggle("on", el.dataset.pt === id));
-    $$("#presets .chip").forEach((x) => x.classList.remove("on"));
+    $$$("#presets .chip").forEach((x) => x.classList.remove("on"));
     updateFullPreview();
     const genBtn = $("#generateImageBtn");
     if (genBtn) {
@@ -5846,7 +5846,7 @@
       });
     }
     $("#sceneInput").addEventListener("input", () => {
-      $$("#presets .chip").forEach((x) => x.classList.remove("on"));
+      $$$("#presets .chip").forEach((x) => x.classList.remove("on"));
       $$(".preset-tile").forEach((x) => x.classList.remove("on"));
       updateFullPreview();
     });
