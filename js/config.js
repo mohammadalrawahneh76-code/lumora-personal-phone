@@ -15,6 +15,7 @@ export const KEYS = {
   bluesmindsKey: PREFIX + "bluesminds_key",
   bluesmindsModel: PREFIX + "bluesminds_model",
   bluesmindsImageModel: PREFIX + "bluesminds_image_model",
+  cfAiWorker: PREFIX + "cf_ai_worker",
   genProvider: PREFIX + "gen_provider",
   fluxModel: PREFIX + "flux_model",
   agentSkills: PREFIX + "agent_skills",

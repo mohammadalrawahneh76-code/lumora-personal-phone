@@ -1554,6 +1554,110 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
   throw allChannelsFailedMessage(tried, lastChannelErr);
 }
 
+/** Default Cloudflare Workers AI image Worker (no CF token in SPA). */
+const CF_AI_WORKER_DEFAULT =
+  "https://lumora-ai.mohammadalrawahneh76.workers.dev";
+
+function getCfAiWorkerBase() {
+  const el = $("#agentCfAiWorker");
+  const fromInput = el ? el.value.trim() : "";
+  let v =
+    fromInput ||
+    (KEYS.cfAiWorker && load(KEYS.cfAiWorker, "")) ||
+    CF_AI_WORKER_DEFAULT;
+  v = String(v || "").trim().replace(/\/+$/, "");
+  return v;
+}
+
+/**
+ * Cloudflare Workers AI text-to-image via lumora-ai Worker.
+ * POST {worker}/generate → { ok, dataUrl }.
+ */
+async function generateWithCloudflareWorkersAI(prompt, aspect, mode, opts) {
+  opts = opts || {};
+  const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
+  const base = getCfAiWorkerBase();
+  if (!base) {
+    throw new Error("Cloudflare image Worker URL is empty.");
+  }
+  const shaped = String(prompt || "").trim();
+  if (!shaped) throw new Error("Describe a scene first");
+  if (onStatus) onStatus("Cloudflare Workers AI · flux-1-schnell…");
+  const endpoint = base + "/generate";
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        prompt: shaped.slice(0, 2048),
+        steps: 4,
+      }),
+    });
+  } catch (err) {
+    throw new Error(
+      (err && err.message) ||
+        "Could not reach Cloudflare Workers AI (network or CORS)."
+    );
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !(data && data.ok)) {
+    const msg =
+      (data && (data.error || data.detail || data.message)) ||
+      "Cloudflare Workers AI error (" + res.status + ")";
+    throw new Error(String(msg).slice(0, 240));
+  }
+  const url = String((data && data.dataUrl) || "").trim();
+  if (!url || !url.startsWith("data:image")) {
+    throw new Error("Cloudflare Workers AI returned no image data");
+  }
+  return url;
+}
+
+/**
+ * BluesMinds first (auto model chain); on no-channel / all fail → CF Workers AI.
+ */
+async function generateImageBluesmindsThenCf(prompt, aspect, mode, opts) {
+  opts = opts || {};
+  const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
+  try {
+    return {
+      url: await generateWithBluesminds(prompt, aspect, mode, opts),
+      provider: "bluesminds",
+    };
+  } catch (err) {
+    const msg = String((err && err.message) || "");
+    const canFallback =
+      (err && err.allChannelsFailed) ||
+      /no image channel|no available channel|all fail/i.test(msg);
+    if (!canFallback) throw err;
+    if (onStatus) onStatus("BluesMinds unavailable — Cloudflare Workers AI…");
+    try {
+      const url = await generateWithCloudflareWorkersAI(
+        prompt,
+        aspect,
+        mode,
+        opts
+      );
+      toast("Image via Cloudflare Workers AI");
+      return { url, provider: "cloudflare-workers-ai" };
+    } catch (cfErr) {
+      const cfMsg = String((cfErr && cfErr.message) || "CF Workers AI failed");
+      const wrapped = new Error(
+        msg.slice(0, 180) + " · CF fallback: " + cfMsg.slice(0, 120)
+      );
+      wrapped.bluesmindsError = err;
+      wrapped.cfError = cfErr;
+      throw wrapped;
+    }
+  }
+}
+
 function getNvidiaKey() {
   const el = $("#agentNvidiaKey");
   const fromInput = el ? el.value.trim() : "";
@@ -1597,7 +1701,8 @@ function nvidiaFetch(url, init) {
 function updateGenProviderNote(_provider) {
   const note = $("#genProviderNote");
   if (!note) return;
-  note.textContent = "Images via BluesMinds (same key as Agent chat).";
+  note.textContent =
+    "Images try BluesMinds first, then Cloudflare Workers AI if no channel.";
 }
 
 function getFluxModelId() {
@@ -2237,11 +2342,17 @@ async function runBluesmindsAndShow(imagePrompt, aspect, mode) {
     if (typeof setHordeQueueStatus === "function") {
       setHordeQueueStatus("BluesMinds · generating…");
     }
-    const url = await generateWithBluesminds(imagePrompt, aspect, mode, {
-      onStatus: (t) => {
-        if (typeof setHordeQueueStatus === "function") setHordeQueueStatus(t);
-      },
-    });
+    const result = await generateImageBluesmindsThenCf(
+      imagePrompt,
+      aspect,
+      mode,
+      {
+        onStatus: (t) => {
+          if (typeof setHordeQueueStatus === "function") setHordeQueueStatus(t);
+        },
+      }
+    );
+    const url = result && result.url;
     if (typeof setHordeQueueStatus === "function") {
       setHordeQueueStatus("Verifying image…");
     }
@@ -2508,12 +2619,18 @@ async function runStoryboardSet() {
     toast("Storyboard " + (i + 1) + "/" + variants.length + " · " + v.label);
     const imagePrompt = buildImagePrompt(c, v.scene, mode);
     try {
-      const url = await generateWithBluesminds(imagePrompt, aspect, mode, {
-        onStatus: (t) => {
-          setHordeQueueStatus(t);
-          setStoryboardProgress(t + " · frame", i + 1, variants.length);
-        },
-      });
+      const _img = await generateImageBluesmindsThenCf(
+        imagePrompt,
+        aspect,
+        mode,
+        {
+          onStatus: (t) => {
+            setHordeQueueStatus(t);
+            setStoryboardProgress(t + " · frame", i + 1, variants.length);
+          },
+        }
+      );
+      const url = _img && _img.url;
       await assertUsableGenImage(url);
       saveStoryboardFrameToMedia(
         getCharacter(c.id) || c,

@@ -23,7 +23,7 @@ ES modules require HTTP (not `file://`).
 | **Library** | Media · Calendar · Checklist |
 | **Agent** | Chat · Skills |
 
-**BluesMinds** is the only AI backend. Agent **Chat** and **Generate** images both use `api.bluesminds.com` with the same key (`aips_bluesminds_key`, paste under Agent → Chat). Chat default: `gemma-4-26b`. Image default: `gpt-image-1` via `POST /v1/images/generations` (overridable under Agent → Image model). On “no available channel”, Generate auto-tries grok-imagine-image-lite → Gemini image ids and saves the working model. No Horde, Pollinations, or Flux.
+**Chat** stays on **BluesMinds** (`api.bluesminds.com`, key `aips_bluesminds_key` under Agent → Chat; default `gemma-4-26b`). **Generate** images try BluesMinds first (`gpt-image-1` + auto-fallback model chain), then **Cloudflare Workers AI** (`lumora-ai` Worker, `@cf/black-forest-labs/flux-1-schnell`) if no image channel is enabled for the key’s group. Optional Worker URL: Agent → CF image Worker URL (`aips_cf_ai_worker`). No Horde/Pollinations/Flux/NVIDIA as primary.
 
 ## Project structure
 
@@ -37,6 +37,7 @@ js/
   starters/         # Lila Bloom starter
   data/             # Captions, presets, skills, wizard
 proxy/
+  ai-worker.js      # Cloudflare Workers AI images (lumora-ai)
   nvidia-worker.js  # Cloudflare Worker (legacy NIM/Flux CORS proxy; optional)
   README.md         # Deploy notes
 ```

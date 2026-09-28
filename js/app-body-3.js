@@ -553,11 +553,22 @@ const AgentEngines = {
 
       try {
         if (onStatus) onStatus("Image Engine · BluesMinds…");
-        const raw = await generateWithBluesminds(imagePrompt, aspect, mode, {
-          onStatus: (t) => {
-            if (onStatus) onStatus("Image Engine · " + t);
-          },
-        });
+        const gen =
+          typeof generateImageBluesmindsThenCf === "function"
+            ? await generateImageBluesmindsThenCf(imagePrompt, aspect, mode, {
+                onStatus: (t) => {
+                  if (onStatus) onStatus("Image Engine · " + t);
+                },
+              })
+            : {
+                url: await generateWithBluesminds(imagePrompt, aspect, mode, {
+                  onStatus: (t) => {
+                    if (onStatus) onStatus("Image Engine · " + t);
+                  },
+                }),
+                provider: "bluesminds",
+              };
+        const raw = gen && gen.url;
         if (onStatus) onStatus("Image Engine · verifying image…");
         const confirmed = await confirmAgentImage(raw);
         return {
@@ -565,7 +576,7 @@ const AgentEngines = {
           imageUrl: confirmed.chatUrl,
           chatUrl: confirmed.chatUrl,
           mediaUrl: confirmed.mediaUrl,
-          provider: "bluesminds",
+          provider: (gen && gen.provider) || "bluesminds",
           prompt: imagePrompt,
           mode,
           scene,
@@ -1017,6 +1028,26 @@ function wireAgent() {
     };
     bmImgModelEl.addEventListener("change", persistBmImg);
     bmImgModelEl.addEventListener("blur", persistBmImg);
+  }
+
+  const cfAiEl = $("#agentCfAiWorker");
+  if (cfAiEl && !cfAiEl.dataset.bound) {
+    cfAiEl.dataset.bound = "1";
+    const cfDef =
+      typeof CF_AI_WORKER_DEFAULT !== "undefined"
+        ? CF_AI_WORKER_DEFAULT
+        : "https://lumora-ai.mohammadalrawahneh76.workers.dev";
+    const storedCf =
+      (KEYS.cfAiWorker && load(KEYS.cfAiWorker, "")) || cfDef;
+    cfAiEl.value = storedCf;
+    const persistCf = () => {
+      let v = cfAiEl.value.trim().replace(/\/+$/, "");
+      if (!v) v = cfDef;
+      cfAiEl.value = v;
+      if (KEYS.cfAiWorker) save(KEYS.cfAiWorker, v);
+    };
+    cfAiEl.addEventListener("change", persistCf);
+    cfAiEl.addEventListener("blur", persistCf);
   }
 
   const input = $("#agentInput");
