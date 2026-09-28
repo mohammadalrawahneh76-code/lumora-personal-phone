@@ -990,7 +990,17 @@ function wireAgent() {
     const imgDef =
       typeof BLUESMINDS_IMAGE_MODEL_DEFAULT !== "undefined"
         ? BLUESMINDS_IMAGE_MODEL_DEFAULT
-        : "gemini-2.5-flash-image";
+        : "dall-e-3";
+    // One-shot: migrate prior shipped default (gemini-2.5-flash-image) → dall-e-3
+    // (BluesMinds docs example). Leave custom ids untouched.
+    if (KEYS.bluesmindsImageModelV2 && !load(KEYS.bluesmindsImageModelV2, false)) {
+      const cur =
+        (KEYS.bluesmindsImageModel && load(KEYS.bluesmindsImageModel, "")) || "";
+      if (!cur || cur === "gemini-2.5-flash-image") {
+        if (KEYS.bluesmindsImageModel) save(KEYS.bluesmindsImageModel, imgDef);
+      }
+      save(KEYS.bluesmindsImageModelV2, true);
+    }
     const storedImg =
       (KEYS.bluesmindsImageModel && load(KEYS.bluesmindsImageModel, imgDef)) ||
       imgDef;

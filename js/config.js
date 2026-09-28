@@ -28,5 +28,6 @@ export const KEYS = {
   stealListSkillsV2: PREFIX + "steal_list_skills_v2",
   stealListSkillsV3: PREFIX + "steal_list_skills_v3",
   bluesmindsImageSkillsV1: PREFIX + "bluesminds_image_skills_v1",
+  bluesmindsImageModelV2: PREFIX + "bluesminds_image_model_v2",
 };
 

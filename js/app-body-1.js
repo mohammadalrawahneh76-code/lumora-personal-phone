@@ -1259,7 +1259,17 @@ function getBluesmindsModel() {
 }
 
 const BLUESMINDS_IMAGE_API = "https://api.bluesminds.com/v1/images/generations";
-const BLUESMINDS_IMAGE_MODEL_DEFAULT = "gemini-2.5-flash-image";
+/** Official BluesMinds docs example model for POST /v1/images/generations. */
+const BLUESMINDS_IMAGE_MODEL_DEFAULT = "dall-e-3";
+/** Known image-generation ids (ratio_config + docs). Used for toast fallbacks only. */
+const BLUESMINDS_IMAGE_MODEL_FALLBACKS = [
+  "dall-e-3",
+  "gpt-image-1",
+  "gemini-2.5-flash-image",
+  "gemini-3.1-flash-image-preview",
+  "gemini-3-pro-image-preview",
+  "grok-imagine-image-lite",
+];
 
 function getBluesmindsImageModel() {
   const el = $("#agentBluesmindsImageModel");
@@ -1270,21 +1280,62 @@ function getBluesmindsImageModel() {
   return stored || BLUESMINDS_IMAGE_MODEL_DEFAULT;
 }
 
-/** Map Lumora aspects to OpenAI-compatible sizes BluesMinds accepts. */
+/** Suggest a different image model than the one that just failed. */
+function bluesmindsImageFallbackSuggestion(failedModel) {
+  const failed = String(failedModel || "").trim();
+  const list = BLUESMINDS_IMAGE_MODEL_FALLBACKS.filter((m) => m && m !== failed);
+  return list[0] || "";
+}
+
+/**
+ * Map Lumora aspects to OpenAI Images sizes BluesMinds docs accept
+ * (dall-e-3: 1024x1024 | 1024x1792 | 1792x1024).
+ */
 function bluesmindsAspectSize(aspect) {
   switch (aspect) {
     case "1:1":
       return "1024x1024";
     case "9:16":
-      return "1024x1536";
     case "3:4":
     default:
-      return "1024x1536";
+      return "1024x1792";
   }
+}
+
+function bluesmindsImageErrorMessage(data, status) {
+  const errObj = data && data.error;
+  let msg =
+    (errObj &&
+      (typeof errObj === "string"
+        ? errObj
+        : errObj.message || errObj.code || errObj.type)) ||
+    (data && (data.message || data.detail)) ||
+    "";
+  if (typeof msg !== "string") {
+    try {
+      msg = JSON.stringify(msg);
+    } catch (_) {
+      msg = String(msg || "");
+    }
+  }
+  msg = String(msg || "").trim();
+  if (!msg) msg = "BluesMinds image error (" + status + ")";
+  return msg;
+}
+
+function isBluesmindsModelUnavailable(status, msg) {
+  if (status === 404) return true;
+  const m = String(msg || "");
+  // Tight match — do NOT treat every message containing "model" as unavailable
+  // (NSFW/policy rejections often say "model" and must surface the real body).
+  return /no available channel|model[_ ]?(?:is[_ ]?)?(?:not[_ ]found|unavailable|does not exist|unknown)|unknown model|invalid model|model_not_found|deprecat/i.test(
+    m
+  );
 }
 
 /**
  * BluesMinds OpenAI-compatible images/generations.
+ * Docs: { model, prompt, n, size } — example model dall-e-3, size 1024x1024.
  * Returns a data: URL or https URL suitable for preview / assertUsableGenImage.
  */
 async function generateWithBluesminds(prompt, aspect, mode, opts) {
@@ -1303,9 +1354,10 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
 
   if (onStatus) onStatus("BluesMinds · generating…");
 
-  async function postOnce(includeSize) {
-    const payload = { model: model, prompt: shaped };
+  async function postOnce(includeSize, includeResponseFormat) {
+    const payload = { model: model, prompt: shaped, n: 1 };
     if (includeSize) payload.size = size;
+    if (includeResponseFormat) payload.response_format = "b64_json";
     let res;
     try {
       res = await fetch(BLUESMINDS_IMAGE_API, {
@@ -1327,18 +1379,11 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const errObj = data && data.error;
-      const msg =
-        (errObj &&
-          (typeof errObj === "string"
-            ? errObj
-            : errObj.message || errObj.code)) ||
-        (data && (data.message || data.detail)) ||
-        "";
-      const textMsg = typeof msg === "string" ? msg : JSON.stringify(msg || "");
-      const err = new Error(textMsg || "BluesMinds image error (" + res.status + ")");
+      const textMsg = bluesmindsImageErrorMessage(data, res.status);
+      const err = new Error(textMsg);
       err.status = res.status;
       err.body = textMsg;
+      err.raw = data;
       throw err;
     }
     const item =
@@ -1347,7 +1392,6 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
     if (item.b64_json) {
       const b64 = String(item.b64_json).trim();
       if (!b64) throw new Error("Empty BluesMinds b64_json");
-      // Assume PNG unless url hints otherwise — data URL works for preview
       return "data:image/png;base64," + b64;
     }
     if (item.url) {
@@ -1358,19 +1402,67 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
     throw new Error("BluesMinds response missing b64_json and url");
   }
 
+  function wrapModelUnavailable(err) {
+    const apiMsg = String((err && (err.body || err.message)) || "").trim();
+    const suggest = bluesmindsImageFallbackSuggestion(model);
+    let out =
+      "BluesMinds image model unavailable (" +
+      model +
+      ")";
+    if (apiMsg && apiMsg.toLowerCase().indexOf("unavailable") < 0) {
+      out += ": " + apiMsg.slice(0, 160);
+    }
+    if (suggest) {
+      out += " — try " + suggest + " under Agent → Image model.";
+    } else {
+      out += " — pick another id from Agent → Image model (see api.bluesminds.com/pricing).";
+    }
+    const wrapped = new Error(out);
+    wrapped.status = err && err.status;
+    wrapped.body = apiMsg;
+    return wrapped;
+  }
+
   try {
-    return await postOnce(true);
+    return await postOnce(true, true);
   } catch (err) {
     const msg = String((err && err.message) || "");
     const status = err && err.status;
-    // Size rejected or unsupported — retry without size
-    if (
+
+    // Retry without response_format / size when the gateway rejects those fields
+    const retryShape =
       status === 400 ||
-      /size|invalid|unsupported|not support/i.test(msg)
-    ) {
-      if (onStatus) onStatus("BluesMinds · retrying without size…");
-      return await postOnce(false);
+      /size|response_format|b64|invalid|unsupported|not support|unknown parameter/i.test(
+        msg
+      );
+    if (retryShape && !isBluesmindsModelUnavailable(status, msg)) {
+      try {
+        if (onStatus) onStatus("BluesMinds · retrying with simpler payload…");
+        return await postOnce(true, false);
+      } catch (err2) {
+        const msg2 = String((err2 && err2.message) || "");
+        const status2 = err2 && err2.status;
+        if (
+          (status2 === 400 || /size|invalid|unsupported|not support/i.test(msg2)) &&
+          !isBluesmindsModelUnavailable(status2, msg2)
+        ) {
+          if (onStatus) onStatus("BluesMinds · retrying without size…");
+          try {
+            return await postOnce(false, false);
+          } catch (err3) {
+            if (isBluesmindsModelUnavailable(err3 && err3.status, err3 && err3.message)) {
+              throw wrapModelUnavailable(err3);
+            }
+            throw err3;
+          }
+        }
+        if (isBluesmindsModelUnavailable(status2, msg2)) {
+          throw wrapModelUnavailable(err2);
+        }
+        throw err2;
+      }
     }
+
     if (status === 401 || status === 403) {
       throw new Error(
         "Invalid BluesMinds key — paste it under Agent → Chat (api.bluesminds.com/console/token)."
@@ -1379,18 +1471,13 @@ async function generateWithBluesminds(prompt, aspect, mode, opts) {
     if (status === 429) {
       throw new Error("BluesMinds rate limit — wait a moment and try again.");
     }
-    if (status === 404 || /model|not found|deprecat/i.test(msg)) {
-      throw new Error(
-        "BluesMinds image model unavailable (" +
-          model +
-          ") — try gemini-2.5-flash-image."
-      );
+    if (isBluesmindsModelUnavailable(status, msg)) {
+      throw wrapModelUnavailable(err);
     }
+    // Surface real API body (NSFW/policy/etc.) instead of a misleading model toast
     throw err;
   }
 }
-
-
 
 function getNvidiaKey() {
   const el = $("#agentNvidiaKey");
