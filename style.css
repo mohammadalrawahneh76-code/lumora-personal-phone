@@ -900,3 +900,93 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
   max-width: 360px;
   margin-top: 6px;
 }
+
+
+/* Steal List W3–4 */
+.agentic-edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03);
+}
+.agentic-edit-box input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #0d0d0f;
+  color: inherit;
+  font: inherit;
+}
+.agentic-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.agent-edit-row { margin-bottom: 8px; }
+.character-wizard {
+  margin: 8px 0 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+}
+.wizard-group { margin-bottom: 10px; }
+.wizard-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin: 0 0 6px 2px;
+}
+.wizard-chips { gap: 6px; }
+.hero-face-pack { margin-top: 4px; }
+.hero-face-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+.hero-face-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  background: #111;
+  cursor: pointer;
+}
+.hero-face-thumb.primary { border-color: #e8b4bc; box-shadow: 0 0 0 1px #e8b4bc55; }
+.hero-face-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hero-face-thumb .hf-badge {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  font-size: 0.6rem;
+  text-align: center;
+  padding: 2px 0;
+  background: rgba(0,0,0,0.65);
+  color: #eee;
+}
+.hero-face-del {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #f0a0a0;
+  cursor: pointer;
+  margin-left: -4px;
+}
+.hero-upload-label { display: inline-flex; align-items: center; cursor: pointer; }

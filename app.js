@@ -22,6 +22,7 @@
     agentMode: PREFIX + "agent_mode",
     stylePack: PREFIX + "style_pack",
     stealListSkillsV1: PREFIX + "steal_list_skills_v1",
+    stealListSkillsV2: PREFIX + "steal_list_skills_v2",
   };
 
   const $ = (s, el = document) => el.querySelector(s);
@@ -470,10 +471,42 @@
 
   function normalizeFaceLock(fl) {
     const src = fl && typeof fl === "object" ? fl : {};
+    let heroFaces = [];
+    if (Array.isArray(src.heroFaces)) {
+      heroFaces = src.heroFaces
+        .filter(
+          (h) =>
+            h &&
+            typeof h === "object" &&
+            typeof h.dataUrl === "string" &&
+            /^data:image\//i.test(h.dataUrl)
+        )
+        .slice(0, 5)
+        .map((h, i) => ({
+          id: String(h.id || "hf_" + i),
+          dataUrl: h.dataUrl,
+          primary: !!h.primary,
+        }));
+    }
+    if (heroFaces.length) {
+      const prim = heroFaces.find((h) => h.primary);
+      if (!prim) heroFaces[0].primary = true;
+      else {
+        let seen = false;
+        heroFaces = heroFaces.map((h) => {
+          if (h.primary && !seen) {
+            seen = true;
+            return h;
+          }
+          return { ...h, primary: false };
+        });
+      }
+    }
     return {
       enabled: !!src.enabled,
       shortIdentity: String(src.shortIdentity || "").trim().slice(0, 280),
       notes: String(src.notes || "").trim().slice(0, 200),
+      heroFaces,
     };
   }
 
@@ -833,16 +866,20 @@
     if (en) en.checked = !!fl.enabled;
     if (idEl) idEl.value = fl.shortIdentity || "";
     if (notesEl) notesEl.value = fl.notes || "";
+    renderCharacterWizard(c);
+    renderHeroFacePack(c);
     syncFaceLockGenUI(c);
   }
 
   function readBibleForm() {
     let age = parseInt($("#char-age").value, 10);
     if (isNaN(age) || age < 21) age = 21;
+    const prevFl = getFaceLock(current());
     const faceLock = normalizeFaceLock({
       enabled: !!( $("#char-face-lock-enabled") && $("#char-face-lock-enabled").checked ),
       shortIdentity: ($("#char-face-lock-identity") && $("#char-face-lock-identity").value) || "",
       notes: ($("#char-face-lock-notes") && $("#char-face-lock-notes").value) || "",
+      heroFaces: prevFl.heroFaces || [],
     });
     return {
       name: $("#char-name").value.trim() || "Unnamed",
@@ -1268,9 +1305,14 @@
     if (fl.enabled) {
       let shortId = String(fl.shortIdentity || "").trim();
       if (!shortId) shortId = compressMasterToShortIdentity(c);
+      const heroNote =
+        fl.heroFaces && fl.heroFaces.length
+          ? "\nMatch hero face pack (pinned hero stills — same face every time)."
+          : "";
       let prompt =
         "Identity lock (keep face/body consistent — change only scene/outfit/pose):\n" +
         shortId +
+        heroNote +
         "\n\nScene:\n" +
         sceneText;
       if (m === "nsfw") prompt = NSFW_LOCK + "\n\n" + prompt;
@@ -2199,10 +2241,12 @@
             ratio +
             '"><span class="tag">' +
             (m.type === "video-pending"
-              ? "Video…"
+              ? m.tags && m.tags.indexOf("animate-still") >= 0
+                ? "Anim…"
+                : "Video…"
               : m.type === "storyboard" || (m.tags && m.tags.indexOf("storyboard") >= 0)
                 ? "SB"
-                : m.imageUrl
+                : m.imageUrl || m.imageDataUrl
                   ? "Gen"
                   : "Note") +
             '</span><img src="' +
@@ -2600,6 +2644,42 @@
       enabled: true,
       modes: ["studio", "both"],
     },
+    {
+      id: "agentic-edit",
+      name: "Agentic edit",
+      description: "Rogue-style edit last image (outfit/light/angle)",
+      body:
+        "Agentic edit (Rogue-style): when user says “change only the outfit to…”, “softer light”, “new angle”, or taps Apply edit, take the last successful still and rebuild a scene that keeps Face-lock identity fixed while applying ONLY that change. Run Image Engine (Horde Soft/Suggestive/NSFW from current mode, Pollinations Soft/Suggestive fallback). Never fake success — confirmAgentImage must pass. If no last still, ask them to generate an image first.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "animate-last-still",
+      name: "Animate last still",
+      description: "Candy/OurDream animate — honest free stub job card",
+      body:
+        "Animate this (Candy/OurDream UX): button or “animate this” uses the last still as start frame, motion prompt (user or default subtle blink/breathing/soft camera hold), optional end-frame placeholder. Video Engine is an honest free stub — save video-pending media with start frame + motion label; tell user free video isn’t rendered yet but the job is queued in Media for a future free motion backend. If no last still, toast to generate an image first. Never claim Seedance works free.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "character-wizard",
+      name: "Character wizard",
+      description: "Candy-style look chips → bible + shortIdentity",
+      body:
+        "Character wizard on Look/Bible: guided chips for hair, eyes, body vibe, personality vibe, aesthetic. Tapping chips updates attrs + merges Face-lock shortIdentity (do not blindly wipe custom notes). User can still edit free text after. Fictional adults 21+ only.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "hero-face-pack",
+      name: "Hero face pack",
+      description: "Pin 3–5 hero face stills; reinforce identity",
+      body:
+        "Hero face pack (Rogue/APOB): user uploads/pins up to 5 hero face stills on the character (compressed ~640px JPEG in localStorage). Show thumbnails; set primary face-lock ref. When generating, reinforce shortIdentity + “match hero face pack” in the prompt. Prompt-only reinforcement this wave (no img2img unless a clean CORS-safe Horde source_image path already exists). Free only.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
   ];
 
   const GROK_NSFW_AGENT_SKILLS = [
@@ -2933,6 +3013,19 @@
         list = getAgentSkills();
       }
       save(KEYS.stealListSkillsV1, true);
+    }
+    // One-shot: merge Steal List W3–4 skills if missing
+    if (!load(KEYS.stealListSkillsV2, false)) {
+      const have4 = new Set((list || []).map((s) => s.id));
+      const want = ["agentic-edit", "animate-last-still", "character-wizard", "hero-face-pack"];
+      const add4 = STEAL_LIST_AGENT_SKILLS.filter(
+        (s) => want.indexOf(s.id) >= 0 && !have4.has(s.id)
+      );
+      if (add4.length) {
+        setAgentSkills([...(list || []), ...add4.map((s) => ({ ...s }))]);
+        list = getAgentSkills();
+      }
+      save(KEYS.stealListSkillsV2, true);
     }
   }
   function skillApplies(skill, mode) {
@@ -3486,6 +3579,602 @@
   }
 
 
+
+  // ——— Steal List W3–4: last still / agentic edit / animate / wizard / hero pack ———
+  function getLastStillUrl(c) {
+    if (state.lastGenUrl) return state.lastGenUrl;
+    const img = $("#genPreviewImg");
+    if (img && !img.hidden && img.src && /^https?:|^data:|^blob:/i.test(img.src)) {
+      return img.src;
+    }
+    const media = (c && c.media) || [];
+    for (let i = 0; i < media.length; i++) {
+      const m = media[i];
+      if (m && m.type === "video-pending") continue;
+      const src = mediaSrc(m);
+      if (src) return src;
+    }
+    try {
+      const hist = getAgentChat(getAgentMode()) || [];
+      for (let i = hist.length - 1; i >= 0; i--) {
+        if (hist[i] && hist[i].imageUrl) return hist[i].imageUrl;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function looksLikeAgenticEdit(text) {
+    return /\b(change\s+only\s+(the\s+)?(outfit|light|lighting|angle|pose|clothes)|softer\s+light|new\s+angle|edit\s+(the\s+)?(last\s+)?(image|still|photo|gen)|apply\s+edit|tweak\s+(the\s+)?(outfit|light|lighting|angle)|make\s+(the\s+)?(light|lighting)\s+softer|outfit\s+to\b)\b/i.test(
+      String(text || "")
+    );
+  }
+
+  function looksLikeAnimateRequest(text) {
+    return /\b(animate\s+(this|that|it|last|the\s+still|the\s+image)|make\s+(this|that|it|the\s+still|the\s+image)\s+move|add\s+(subtle\s+)?motion)\b/i.test(
+      String(text || "")
+    );
+  }
+
+  function buildAgenticEditScene(instruction) {
+    const instr = String(instruction || "").trim().slice(0, 280);
+    return (
+      "Keep the exact same character identity and overall composition as the previous still. " +
+      "Apply ONLY this change (outfit / light / angle as requested — do not alter face, hair color, body type, or identity): " +
+      instr
+    );
+  }
+
+  async function applyAgenticEdit(instruction, opts) {
+    opts = opts || {};
+    const c = current();
+    if (!c) {
+      toast("Open a character first");
+      return { ok: false, error: "No character" };
+    }
+    if (state.genLoading || state.agentLoading || state.storyboardRunning) {
+      toast("Already generating — wait for the current job");
+      return { ok: false, error: "Busy" };
+    }
+    const instr = String(instruction || "").trim();
+    if (!instr) {
+      toast("Describe the edit (outfit / light / angle)");
+      return { ok: false, error: "Empty instruction" };
+    }
+    const last = getLastStillUrl(c);
+    if (!last) {
+      toast("Generate an image first");
+      return { ok: false, error: "No last still" };
+    }
+    const scene = buildAgenticEditScene(instr);
+    const mode = getGenMode();
+    const aspect =
+      ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "3:4";
+    const fromAgent = !!opts.fromAgent;
+    const chatMode = getAgentMode();
+
+    if (fromAgent) {
+      const history = getAgentChat(chatMode);
+      history.push({ role: "user", content: instr, ts: Date.now() });
+      setAgentChat(chatMode, history);
+      state.agentLoading = true;
+      state.agentStatusText = "Agentic edit · Image Engine…";
+      syncAgentGenBtn();
+      renderAgentChat();
+    } else {
+      setGenLoading(true);
+      toast("Agentic edit · queuing…");
+    }
+
+    try {
+      const result = await agentEngineImage({
+        scene,
+        mode,
+        aspect,
+        character: c,
+        onStatus: (t) => {
+          if (fromAgent) {
+            state.agentStatusText = t;
+            renderAgentChat();
+          }
+        },
+      });
+      if (!result || !result.ok || !result.chatUrl) {
+        throw new Error((result && result.error) || "Edit failed — no image");
+      }
+      // confirmAgentImage already used inside Image Engine
+      const chatUrl = result.chatUrl;
+      const mediaUrl = result.mediaUrl || result.chatUrl;
+      state.lastGenUrl = mediaUrl || chatUrl;
+      lightUpdateGenPreview(chatUrl);
+      try {
+        saveAgentGenToMedia(
+          getCharacter(c.id) || c,
+          mediaUrl || chatUrl,
+          "Edit · " + mode + " · " + instr.slice(0, 40),
+          "Agentic edit from last still. Change: " + instr.slice(0, 200),
+          aspect
+        );
+        renderMedia();
+      } catch (_) {}
+      if (fromAgent) {
+        const next = getAgentChat(chatMode);
+        next.push({
+          role: "assistant",
+          content:
+            "Agentic edit · " +
+            mode +
+            " · " +
+            (result.provider || "horde") +
+            "\n" +
+            instr.slice(0, 160),
+          imageUrl: chatUrl,
+          ts: Date.now(),
+        });
+        setAgentChat(chatMode, next);
+      }
+      toast("Edit ready (" + (result.provider || "horde") + ")");
+      return { ok: true, chatUrl, mediaUrl, provider: result.provider };
+    } catch (err) {
+      const msg = (err && err.message) || "Agentic edit failed";
+      toast(msg);
+      if (fromAgent) {
+        const next = getAgentChat(chatMode);
+        next.push({
+          role: "assistant",
+          content: "Agentic edit couldn't apply that. " + msg,
+          ts: Date.now(),
+        });
+        setAgentChat(chatMode, next);
+      }
+      return { ok: false, error: msg };
+    } finally {
+      if (fromAgent) {
+        state.agentLoading = false;
+        state.agentStatusText = "";
+        syncAgentGenBtn();
+        renderAgentChat();
+      }
+      setGenLoading(false);
+    }
+  }
+
+  async function animateLastStill(motionPrompt, opts) {
+    opts = opts || {};
+    const c = current();
+    if (!c) {
+      toast("Open a character first");
+      return { ok: false };
+    }
+    const still = getLastStillUrl(c);
+    if (!still) {
+      toast("Generate an image first");
+      return { ok: false, error: "No last still" };
+    }
+    const motion =
+      String(motionPrompt || "").trim() ||
+      "subtle natural motion, blink, breathing, soft camera hold";
+    const mode = getGenMode();
+    const aspect =
+      ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "9:16";
+    const fromAgent = !!opts.fromAgent;
+    const chatMode = getAgentMode();
+
+    if (fromAgent) {
+      const history = getAgentChat(chatMode);
+      history.push({
+        role: "user",
+        content: "Animate this: " + motion,
+        ts: Date.now(),
+      });
+      setAgentChat(chatMode, history);
+      state.agentLoading = true;
+      state.agentStatusText = "Video Engine · animate still…";
+      syncAgentGenBtn();
+      renderAgentChat();
+    }
+
+    try {
+      const result = await agentEngineVideo({
+        scene: motion,
+        mode,
+        aspect,
+        character: c,
+        startFrameUrl: still,
+        motionPrompt: motion,
+        endFrameUrl: null,
+        onStatus: (t) => {
+          if (fromAgent) {
+            state.agentStatusText = t;
+            renderAgentChat();
+          }
+        },
+      });
+      const reply =
+        (result && result.message) ||
+        "Video engine: free video isn’t rendered yet — job queued in Media.";
+      try {
+        saveAgentVideoPendingToMedia(
+          getCharacter(c.id) || c,
+          "Animate still · " + mode + " · " + motion.slice(0, 28),
+          "Motion: " +
+            motion.slice(0, 180) +
+            " | Free video not rendered yet — queued for when a free motion backend exists.",
+          aspect,
+          mode,
+          {
+            startFrameUrl: still,
+            motionPrompt: motion,
+            endFrameUrl: null,
+            label: "video-pending · animate last still",
+          }
+        );
+        renderMedia();
+      } catch (_) {}
+      if (fromAgent) {
+        const next = getAgentChat(chatMode);
+        next.push({ role: "assistant", content: reply, ts: Date.now() });
+        setAgentChat(chatMode, next);
+      }
+      toast("Animate queued · video-pending in Media");
+      return { ok: true, pending: true };
+    } catch (err) {
+      const msg = (err && err.message) || "Animate failed";
+      toast(msg);
+      if (fromAgent) {
+        const next = getAgentChat(chatMode);
+        next.push({
+          role: "assistant",
+          content: "Animate: " + msg,
+          ts: Date.now(),
+        });
+        setAgentChat(chatMode, next);
+      }
+      return { ok: false, error: msg };
+    } finally {
+      if (fromAgent) {
+        state.agentLoading = false;
+        state.agentStatusText = "";
+        syncAgentGenBtn();
+        renderAgentChat();
+      }
+    }
+  }
+
+  const WIZARD_GROUPS = [
+    {
+      id: "hair",
+      label: "Hair",
+      attr: "hair",
+      options: [
+        "Long soft rose-pink wavy",
+        "Long dark wavy",
+        "Sleek blonde",
+        "Curly auburn",
+        "Short black bob",
+        "Braided",
+        "Shoulder-length brown",
+        "Short textured fade",
+      ],
+    },
+    {
+      id: "eyes",
+      label: "Eyes",
+      attr: "eyes",
+      options: ["Honey-brown", "Brown", "Hazel", "Green", "Blue", "Dark brown"],
+    },
+    {
+      id: "body",
+      label: "Body vibe",
+      attr: "body",
+      options: [
+        "Petite soft hourglass",
+        "Slim",
+        "Athletic",
+        "Curvy",
+        "Muscular",
+        "Soft average",
+      ],
+    },
+    {
+      id: "style",
+      label: "Aesthetic",
+      attr: "style",
+      options: [
+        "Soft cute pastel",
+        "Minimal clean",
+        "Sporty chic",
+        "Streetwear",
+        "High fashion",
+        "Fitness glow",
+        "Bohemian",
+        "Business smart",
+      ],
+    },
+    {
+      id: "personality",
+      label: "Personality vibe",
+      attr: "_personalityVibe",
+      options: [
+        "Shy sweet",
+        "Playful flirty",
+        "Warm cozy",
+        "Confident cool",
+        "Soft romantic",
+        "Sporty energetic",
+      ],
+    },
+  ];
+
+  const PERSONALITY_VIBE_TEXT = {
+    "Shy sweet":
+      "Soft-spoken, sweet, and a little shy — warm and easily flustered in a cute way.",
+    "Playful flirty":
+      "Playful and lightly flirty, teasing without being mean; warm and curious.",
+    "Warm cozy":
+      "Warm, cozy, affectionate — loves soft rituals and gentle compliments.",
+    "Confident cool":
+      "Confident, cool, and composed with a soft edge; adult and self-assured.",
+    "Soft romantic":
+      "Soft romantic energy — intimate, tender, and emotionally open when trusted.",
+    "Sporty energetic":
+      "Energetic and sporty, upbeat, motivational tone with a friendly wink.",
+  };
+
+  function mergeShortIdentityFromAttrs(c, attrs, keepCustom) {
+    const base = {
+      ...(c || {}),
+      attrs: { ...((c && c.attrs) || {}), ...(attrs || {}) },
+    };
+    const generated = compressMasterToShortIdentity(base);
+    if (!keepCustom) return generated;
+    const fl = getFaceLock(c);
+    const existing = String(fl.shortIdentity || "").trim();
+    if (!existing) return generated;
+    // Merge: if existing already covers generated bits, keep; else append unique hair/eyes/body cues
+    const lower = existing.toLowerCase();
+    const bits = [];
+    if (attrs.hair && lower.indexOf(String(attrs.hair).toLowerCase().slice(0, 12)) < 0) {
+      bits.push(String(attrs.hair));
+    }
+    if (attrs.eyes && lower.indexOf(String(attrs.eyes).toLowerCase().slice(0, 8)) < 0) {
+      bits.push(String(attrs.eyes) + " eyes");
+    }
+    if (attrs.body && lower.indexOf(String(attrs.body).toLowerCase().slice(0, 10)) < 0) {
+      bits.push(String(attrs.body));
+    }
+    if (!bits.length) return existing.slice(0, 280);
+    let merged = existing.replace(/[.\s]+$/, "") + "; " + bits.join(", ") + ".";
+    if (merged.length > 280) merged = generated;
+    return merged.slice(0, 280);
+  }
+
+  function applyWizardSelection(groupId, value) {
+    const c = current();
+    if (!c) {
+      toast("Open a character first");
+      return;
+    }
+    const group = WIZARD_GROUPS.find((g) => g.id === groupId);
+    if (!group) return;
+    const attrs = { ...(c.attrs || {}) };
+    const patch = {};
+    if (group.attr === "_personalityVibe") {
+      const text = PERSONALITY_VIBE_TEXT[value] || value;
+      const persEl = $("#char-personality");
+      const curPers = (persEl && persEl.value) || c.personality || "";
+      // Merge vibe into personality without blindly wiping custom notes
+      if (!curPers.trim()) {
+        patch.personality = text;
+        if (persEl) persEl.value = text;
+      } else if (curPers.toLowerCase().indexOf(value.toLowerCase().slice(0, 8)) < 0) {
+        const merged = (curPers.trim() + " · Vibe: " + value).slice(0, 500);
+        patch.personality = merged;
+        if (persEl) persEl.value = merged;
+      }
+      attrs.personalityVibe = value;
+    } else {
+      attrs[group.attr] = value;
+      patch.attrs = attrs;
+    }
+    patch.attrs = attrs;
+    const shortIdentity = mergeShortIdentityFromAttrs(
+      { ...c, ...patch, attrs },
+      attrs,
+      true
+    );
+    const fl = normalizeFaceLock({
+      ...getFaceLock(c),
+      shortIdentity,
+      enabled: true,
+    });
+    patch.faceLock = fl;
+    updateCharacter(c.id, patch);
+    const idEl = $("#char-face-lock-identity");
+    if (idEl) idEl.value = shortIdentity;
+    const en = $("#char-face-lock-enabled");
+    if (en) en.checked = true;
+    const sum = $("#char-attrs-summary");
+    if (sum) sum.value = attrsSummary(getCharacter(c.id) || { ...c, attrs });
+    renderCharacterWizard(getCharacter(c.id) || c);
+    syncFaceLockGenUI(getCharacter(c.id));
+    toast("Wizard · " + group.label + ": " + value);
+  }
+
+  function renderCharacterWizard(c) {
+    const root = $("#characterWizard");
+    if (!root) return;
+    const attrs = (c && c.attrs) || {};
+    root.innerHTML = WIZARD_GROUPS.map((g) => {
+      const currentVal =
+        g.attr === "_personalityVibe"
+          ? attrs.personalityVibe || ""
+          : attrs[g.attr] || "";
+      return (
+        '<div class="wizard-group" data-wg="' +
+        esc(g.id) +
+        '"><div class="wizard-label">' +
+        esc(g.label) +
+        '</div><div class="chips scroll-x wizard-chips">' +
+        g.options
+          .map((opt) => {
+            const on = currentVal === opt ? " on" : "";
+            return (
+              '<button type="button" class="chip' +
+              on +
+              '" data-wv="' +
+              esc(opt) +
+              '">' +
+              esc(opt.replace(/^Long soft rose-pink wavy$/, "Rose-pink soft").replace(/^Petite soft hourglass$/, "Petite soft").replace(/^Soft cute pastel$/, "Soft cute")) +
+              "</button>"
+            );
+          })
+          .join("") +
+        "</div></div>"
+      );
+    }).join("");
+  }
+
+  function resizeImageToDataUrl(file, maxSide) {
+    maxSide = maxSide || 640;
+    return new Promise((resolve, reject) => {
+      if (!file) return reject(new Error("No file"));
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read image"));
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (!w || !h) return reject(new Error("Bad image"));
+            const scale = Math.min(1, maxSide / Math.max(w, h));
+            w = Math.max(1, Math.round(w * scale));
+            h = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", 0.72));
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = () => reject(new Error("Image decode failed"));
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderHeroFacePack(c) {
+    const root = $("#heroFacePack");
+    if (!root) return;
+    const fl = getFaceLock(c);
+    const faces = fl.heroFaces || [];
+    const thumbs =
+      faces.length === 0
+        ? '<p class="hint">No hero faces yet — upload 1–5 stills (resized ~640px JPEG to save quota).</p>'
+        : '<div class="hero-face-thumbs">' +
+          faces
+            .map(
+              (h) =>
+                '<button type="button" class="hero-face-thumb' +
+                (h.primary ? " primary" : "") +
+                '" data-hf="' +
+                esc(h.id) +
+                '" title="' +
+                (h.primary ? "Primary face-lock ref" : "Set as primary") +
+                '"><img src="' +
+                esc(h.dataUrl) +
+                '" alt="Hero face" /><span class="hf-badge">' +
+                (h.primary ? "Primary" : "Set") +
+                '</span></button><button type="button" class="hero-face-del" data-hf-del="' +
+                esc(h.id) +
+                '" aria-label="Remove">×</button>'
+            )
+            .join("") +
+          "</div>";
+    root.innerHTML =
+      thumbs +
+      '<div class="toolbar" style="margin-top:8px;gap:8px;flex-wrap:wrap">' +
+      '<label class="btn btn-ghost btn-sm hero-upload-label">Upload face' +
+      '<input type="file" id="heroFaceFile" accept="image/*" hidden ' +
+      (faces.length >= 5 ? "disabled" : "") +
+      " /></label>" +
+      '<span class="hint">' +
+      faces.length +
+      "/5 · longest side ~640px · local only</span></div>";
+  }
+
+  async function addHeroFaceFromFile(file) {
+    const c = current();
+    if (!c) {
+      toast("Open a character first");
+      return;
+    }
+    const fl = normalizeFaceLock(getFaceLock(c));
+    if ((fl.heroFaces || []).length >= 5) {
+      toast("Max 5 hero faces");
+      return;
+    }
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 640);
+      // rough quota guard ~450KB per face after compress
+      if (dataUrl.length > 550000) {
+        toast("Image still too large after compress — try a simpler crop");
+        return;
+      }
+      const faces = [...(fl.heroFaces || [])];
+      const id = uid("hf");
+      faces.push({ id, dataUrl, primary: faces.length === 0 });
+      fl.heroFaces = faces;
+      if (!fl.notes || !/hero face pack/i.test(fl.notes)) {
+        fl.notes = ((fl.notes ? fl.notes + " · " : "") + "Hero face pack pinned").slice(0, 200);
+      }
+      fl.enabled = true;
+      if (!fl.shortIdentity) {
+        fl.shortIdentity = compressMasterToShortIdentity(c);
+      }
+      updateCharacter(c.id, { faceLock: fl });
+      const notesEl = $("#char-face-lock-notes");
+      if (notesEl && !notesEl.value.trim()) notesEl.value = fl.notes;
+      const en = $("#char-face-lock-enabled");
+      if (en) en.checked = true;
+      renderHeroFacePack(getCharacter(c.id) || c);
+      syncFaceLockGenUI(getCharacter(c.id));
+      toast("Hero face added" + (faces.length === 1 ? " · set as primary" : ""));
+    } catch (err) {
+      toast((err && err.message) || "Could not add hero face");
+    }
+  }
+
+  function setPrimaryHeroFace(id) {
+    const c = current();
+    if (!c) return;
+    const fl = normalizeFaceLock(getFaceLock(c));
+    fl.heroFaces = (fl.heroFaces || []).map((h) => ({
+      ...h,
+      primary: h.id === id,
+    }));
+    updateCharacter(c.id, { faceLock: fl });
+    renderHeroFacePack(getCharacter(c.id) || c);
+    toast("Primary face-lock ref set");
+  }
+
+  function removeHeroFace(id) {
+    const c = current();
+    if (!c) return;
+    const fl = normalizeFaceLock(getFaceLock(c));
+    fl.heroFaces = (fl.heroFaces || []).filter((h) => h.id !== id);
+    if (fl.heroFaces.length && !fl.heroFaces.some((h) => h.primary)) {
+      fl.heroFaces[0].primary = true;
+    }
+    updateCharacter(c.id, { faceLock: fl });
+    renderHeroFacePack(getCharacter(c.id) || c);
+    toast("Hero face removed");
+  }
+
   /**
    * Agent-owned engines — named capabilities the Agent invokes (front door).
    * Studio Generate tab can still work independently; Agent does not depend on opening it.
@@ -3617,15 +4306,24 @@
         const scene = String(opts.scene || "").trim() || "short character clip";
         const mode =
           opts.mode === "suggestive" || opts.mode === "nsfw" ? opts.mode : "soft";
+        const startFrameUrl = opts.startFrameUrl || null;
+        const motionPrompt =
+          String(opts.motionPrompt || opts.scene || "").trim() ||
+          "subtle natural motion, blink, breathing, soft camera hold";
+        const endFrameUrl = opts.endFrameUrl || null;
         if (onStatus) onStatus("Video Engine · checking free options…");
-        const message =
-          "Video engine: free video isn’t available yet in Lumora Personal. " +
-          "No CORS-friendly free Seedance/APOB-quality path without keys or payment. " +
-          "I saved a video-pending note for “" +
-          scene.slice(0, 80) +
-          "” (" +
-          mode +
-          "). Use Image Engine for stills meanwhile — or ask again when a free video path lands.";
+        const message = startFrameUrl
+          ? "Animate this: free video isn’t rendered yet in Lumora Personal. " +
+            "I queued a video-pending job in Media with your start frame + motion (“" +
+            motionPrompt.slice(0, 72) +
+            "”). When a free motion backend exists, that card is ready — Image Engine stills work now."
+          : "Video engine: free video isn’t available yet in Lumora Personal. " +
+            "No CORS-friendly free Seedance/APOB-quality path without keys or payment. " +
+            "I saved a video-pending note for “" +
+            scene.slice(0, 80) +
+            "” (" +
+            mode +
+            "). Use Image Engine for stills meanwhile — or ask again when a free video path lands.";
         return {
           ok: false,
           pending: true,
@@ -3633,6 +4331,9 @@
           error: "Free video stub — not available yet",
           mode,
           scene,
+          startFrameUrl,
+          motionPrompt,
+          endFrameUrl,
         };
       },
     },
@@ -3645,20 +4346,27 @@
     return AgentEngines.video.run(opts);
   }
 
-  function saveAgentVideoPendingToMedia(c, label, notes, aspect, mode) {
+  function saveAgentVideoPendingToMedia(c, label, notes, aspect, mode, extra) {
     if (!c) return;
+    extra = extra || {};
+    const start = extra.startFrameUrl || null;
+    const isData = start && String(start).indexOf("data:image") === 0;
     const media = [
       {
         id: uid("m"),
-        label: String(label || "Video pending").slice(0, 80),
+        label: String(label || extra.label || "Video pending").slice(0, 80),
         notes: String(notes || "").slice(0, 500),
         aspect: aspect || "9:16",
-        imageDataUrl: null,
-        imageUrl: null,
+        imageDataUrl: isData ? start : null,
+        imageUrl: start && !isData ? start : null,
         type: "video-pending",
         mode: mode || "soft",
+        motionPrompt: String(extra.motionPrompt || "").slice(0, 240) || null,
+        endFrameUrl: extra.endFrameUrl || null,
+        startFrameUrl: start || null,
         createdAt: new Date().toISOString(),
         source: "agent-video",
+        tags: ["video-pending", start ? "animate-still" : "video-stub"],
       },
       ...(c.media || []),
     ];
@@ -3992,6 +4700,15 @@
     const input = $("#agentInput");
     const text = ((input && input.value) || "").trim();
     if (!text) return;
+    if (looksLikeAnimateRequest(text)) {
+      const motion = text
+        .replace(/^.*?animate\s+(this|that|it|last|the\s+still|the\s+image)\s*[:\-]?\s*/i, "")
+        .trim();
+      return animateLastStill(motion || text, { fromAgent: true });
+    }
+    if (looksLikeAgenticEdit(text)) {
+      return applyAgenticEdit(text, { fromAgent: true });
+    }
     if (looksLikeVideoRequest(text)) {
       return generateAgentVideo();
     }
@@ -4049,6 +4766,28 @@
     if (genBtn) genBtn.addEventListener("click", () => generateAgentImage());
     const videoBtn = $("#agentVideoBtn");
     if (videoBtn) videoBtn.addEventListener("click", () => generateAgentVideo());
+    const agentEditBtn = $("#agentEditBtn");
+    if (agentEditBtn) {
+      agentEditBtn.addEventListener("click", () => {
+        const inp = $("#agentEditInput") || $("#agentInput");
+        const v = ((inp && inp.value) || "").trim();
+        if (!v) {
+          toast("Type an edit (outfit / light / angle)");
+          if (inp) inp.focus();
+          return;
+        }
+        applyAgenticEdit(v, { fromAgent: true });
+        if ($("#agentEditInput")) $("#agentEditInput").value = "";
+      });
+    }
+    const agentAnimateBtn = $("#agentAnimateBtn");
+    if (agentAnimateBtn) {
+      agentAnimateBtn.addEventListener("click", () => {
+        const inp = $("#agentEditInput") || $("#agentInput");
+        const v = ((inp && inp.value) || "").trim();
+        animateLastStill(v, { fromAgent: true });
+      });
+    }
     syncAgentGenBtn();
     renderAgentEnginesPanel();
     const input = $("#agentInput");
@@ -4573,6 +5312,56 @@
     setGenMode(load(KEYS.genMode, "soft"));
     syncHordeKeyVisibility();
     $("#generateImageBtn").addEventListener("click", () => generateSceneImage());
+    // Steal List W3: agentic edit + animate on Generate preview
+    const genEditBtn = $("#agenticEditBtn");
+    if (genEditBtn && !genEditBtn.dataset.bound) {
+      genEditBtn.dataset.bound = "1";
+      genEditBtn.addEventListener("click", () => {
+        const inp = $("#agenticEditInput");
+        applyAgenticEdit(((inp && inp.value) || "").trim(), { fromAgent: false });
+      });
+    }
+    const genAnimateBtn = $("#animateStillBtn");
+    if (genAnimateBtn && !genAnimateBtn.dataset.bound) {
+      genAnimateBtn.dataset.bound = "1";
+      genAnimateBtn.addEventListener("click", () => {
+        const inp = $("#agenticEditInput");
+        animateLastStill(((inp && inp.value) || "").trim(), { fromAgent: false });
+      });
+    }
+    document.body.dataset.agenticEditBoxBound = "1";
+    // Steal List W4: character wizard chips + hero face pack
+    const wiz = $("#characterWizard");
+    if (wiz && !wiz.dataset.bound) {
+      wiz.dataset.bound = "1";
+      wiz.addEventListener("click", (e) => {
+        const chip = e.target.closest(".chip[data-wv]");
+        if (!chip) return;
+        const group = chip.closest(".wizard-group");
+        if (!group) return;
+        applyWizardSelection(group.dataset.wg, chip.dataset.wv);
+      });
+    }
+    const heroRoot = $("#heroFacePack");
+    if (heroRoot && !heroRoot.dataset.bound) {
+      heroRoot.dataset.bound = "1";
+      heroRoot.addEventListener("change", (e) => {
+        const fileInput = e.target.closest("#heroFaceFile");
+        if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
+        addHeroFaceFromFile(fileInput.files[0]).finally(() => {
+          fileInput.value = "";
+        });
+      });
+      heroRoot.addEventListener("click", (e) => {
+        const del = e.target.closest("[data-hf-del]");
+        if (del) {
+          removeHeroFace(del.getAttribute("data-hf-del"));
+          return;
+        }
+        const thumb = e.target.closest("[data-hf]");
+        if (thumb) setPrimaryHeroFace(thumb.getAttribute("data-hf"));
+      });
+    }
     $("#copyFullPromptBtn").addEventListener("click", async () => {
       const c = current();
       if (!c) return;
