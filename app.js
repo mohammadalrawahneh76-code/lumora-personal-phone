@@ -1343,7 +1343,7 @@
     return text || fallback || ("AI Horde error (" + status + ")");
   }
 
-  async function generateWithHorde(prompt, aspect, mode) {
+  async function generateWithHorde(prompt, aspect, mode, opts) {
     const { width, height } = hordeAspectSize(aspect);
     const seedEl = $("#genSeed");
     const modelEl = $("#genModel");
@@ -1408,7 +1408,9 @@
     }
     const id = submitJson.id;
     if (!id) throw new Error("AI Horde did not return a job id");
-    const deadline = Date.now() + 300000; // 5 min — NSFW/anonymous queues can be slow
+    opts = opts || {};
+    const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
+    const deadline = Date.now() + 360000; // 6 min — NSFW/anonymous queues can be slow
     let done = false;
     let lastCheck = {};
     while (Date.now() < deadline) {
@@ -1438,6 +1440,18 @@
         throw new Error(
           "No AI Horde workers available for this request — try again later or clear the model override."
         );
+      }
+      if (onStatus) {
+        const q = check.queue_position;
+        if (check.done) {
+          onStatus("AI Horde finished — fetching image…");
+        } else if (typeof q === "number" && q > 0) {
+          onStatus("AI Horde queue #" + q + " (free, hang tight)…");
+        } else if (check.processing) {
+          onStatus("AI Horde generating…");
+        } else {
+          onStatus("Waiting for AI Horde worker…");
+        }
       }
       if (check.done) {
         done = true;
@@ -1539,6 +1553,64 @@
     const objUrl = URL.createObjectURL(blob);
     state.objectUrls.push(objUrl);
     return objUrl;
+  }
+
+  /** Resolve only after the browser actually decodes pixels (naturalWidth > 0). */
+  function waitImageLoad(url, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const ms = timeoutMs || 45000;
+      const img = new Image();
+      let settled = false;
+      const finish = (fn) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        img.onload = null;
+        img.onerror = null;
+        try {
+          img.removeAttribute("src");
+        } catch (_) {}
+        fn();
+      };
+      const timer = setTimeout(() => {
+        finish(() => reject(new Error("Image load timed out")));
+      }, ms);
+      img.onload = () => {
+        const ok = img.naturalWidth > 0 && img.naturalHeight > 0;
+        finish(() => {
+          if (ok) resolve(url);
+          else reject(new Error("Image loaded empty (0×0)"));
+        });
+      };
+      img.onerror = () => {
+        finish(() => reject(new Error("Image failed to load in browser")));
+      };
+      try {
+        img.referrerPolicy = "no-referrer";
+      } catch (_) {}
+      img.src = url;
+    });
+  }
+
+  /**
+   * Prefer a session blob URL when CORS fetch works; otherwise a confirmed https/data URL.
+   * Never returns a URL that did not decode in Image().
+   */
+  async function confirmAgentImage(url) {
+    const raw = String(url || "").trim();
+    if (!raw) throw new Error("No image URL");
+    // Blob path: fetch bytes then verify decode
+    try {
+      const blobUrl = await tryFetchImageAsBlobUrl(raw);
+      await waitImageLoad(blobUrl, 20000);
+      return {
+        chatUrl: blobUrl,
+        mediaUrl: /^https?:\/\//i.test(raw) || raw.startsWith("data:") ? raw : blobUrl,
+      };
+    } catch (_) {}
+    // Direct load (works when hotlink displays but CORS fetch is blocked)
+    await waitImageLoad(raw, 60000);
+    return { chatUrl: raw, mediaUrl: raw };
   }
 
   function softenGenFailToast(extra) {
@@ -1970,6 +2042,10 @@
   const AGENT_CHAT_CAP = 40;
   const POLLINATIONS_CHAT = "https://text.pollinations.ai/openai";
   const POLLINATIONS_GET = "https://text.pollinations.ai/";
+  const POLLINATIONS_GEN_CHAT = "https://gen.pollinations.ai/v1/chat/completions";
+  const AGENT_SKILLS_MAX = 2500;
+  const AGENT_SYSTEM_MAX = 3500;
+  const AGENT_HISTORY_TURNS = 8;
 
   const STARTER_AGENT_SKILLS = [
     {
@@ -2309,12 +2385,23 @@
   function buildSkillsBlock(mode) {
     const skills = enabledSkillsForMode(mode);
     if (!skills.length) return "";
-    return (
-      "Taught skills (follow these):\n" +
-      skills
-        .map((s, i) => (i + 1) + ". " + s.name + ": " + (s.body || s.description || ""))
-        .join("\n")
-    );
+    const header = "Taught skills (follow these):\n";
+    let out = header;
+    for (let i = 0; i < skills.length; i++) {
+      const s = skills[i];
+      const line =
+        (i + 1) + ". " + s.name + ": " + (s.body || s.description || "");
+      const next = out + (out === header ? "" : "\n") + line;
+      if (next.length > AGENT_SKILLS_MAX) {
+        const room = AGENT_SKILLS_MAX - out.length - (out === header ? 0 : 1);
+        if (room > 48) {
+          out += (out === header ? "" : "\n") + line.slice(0, room - 1) + "…";
+        }
+        break;
+      }
+      out = next;
+    }
+    return out.slice(0, AGENT_SKILLS_MAX);
   }
 
   function buildStudioSystem(c) {
@@ -2355,48 +2442,125 @@
   }
 
   function buildAgentMessages(mode, userText, c) {
-    const system =
+    let system =
       (mode === "lila" ? buildLilaSystem(c) : buildStudioSystem(c)) +
       "\n\n" +
       buildSkillsBlock(mode);
+    if (system.length > AGENT_SYSTEM_MAX) {
+      system = system.slice(0, AGENT_SYSTEM_MAX - 1) + "…";
+    }
     const history = getAgentChat(mode)
       .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
-      .slice(-24)
-      .map((m) => ({ role: m.role, content: String(m.content) }));
-    return [{ role: "system", content: system }, ...history, { role: "user", content: userText }];
+      .slice(-AGENT_HISTORY_TURNS)
+      .map((m) => ({
+        role: m.role,
+        content: String(m.content).slice(0, 1200),
+      }));
+    return [
+      { role: "system", content: system },
+      ...history,
+      { role: "user", content: String(userText || "").slice(0, 1500) },
+    ];
   }
 
-  async function callPollinationsChat(messages) {
-    const res = await fetch(POLLINATIONS_CHAT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai", messages: messages, private: true }),
-    });
-    if (!res.ok) throw new Error("Pollinations POST " + res.status);
-    const data = await res.json();
-    const text =
+  function friendlyTextApiError(err, label) {
+    const raw = (err && err.message) || String(err || "");
+    if (/Failed to fetch|NetworkError|Load failed|CORS|network/i.test(raw)) {
+      return (label || "Text API") + " unreachable (network or CORS). Try again in a moment.";
+    }
+    if (/^Pollinations (POST|GET) \d+/.test(raw) || /HTTP \d+/.test(raw)) {
+      return raw;
+    }
+    return raw || ((label || "Text API") + " failed");
+  }
+
+  function extractChatContent(data) {
+    return (
       (data &&
         data.choices &&
         data.choices[0] &&
         data.choices[0].message &&
         data.choices[0].message.content) ||
-      data.response ||
-      data.text ||
-      "";
-    if (!String(text).trim()) throw new Error("Empty reply");
+      (data && data.response) ||
+      (data && data.text) ||
+      ""
+    );
+  }
+
+  async function callPollinationsChat(messages, model) {
+    const useModel = model || "openai";
+    let res;
+    try {
+      res = await fetch(POLLINATIONS_CHAT, {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: useModel,
+          messages: messages,
+          private: true,
+        }),
+      });
+    } catch (err) {
+      throw new Error(friendlyTextApiError(err, "Pollinations chat"));
+    }
+    if (!res.ok) {
+      throw new Error("Pollinations POST " + res.status + " (" + useModel + ")");
+    }
+    const data = await res.json().catch(() => ({}));
+    const text = extractChatContent(data);
+    if (!String(text).trim()) throw new Error("Empty reply (" + useModel + ")");
+    return String(text).trim();
+  }
+
+  async function callGenPollinationsChat(messages) {
+    let res;
+    try {
+      res = await fetch(POLLINATIONS_GEN_CHAT, {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "openai",
+          messages: messages,
+        }),
+      });
+    } catch (err) {
+      throw new Error(friendlyTextApiError(err, "gen.pollinations.ai"));
+    }
+    if (!res.ok) {
+      throw new Error("gen.pollinations.ai POST " + res.status);
+    }
+    const data = await res.json().catch(() => ({}));
+    const text = extractChatContent(data);
+    if (!String(text).trim()) throw new Error("Empty reply (gen)");
     return String(text).trim();
   }
 
   async function callPollinationsGet(messages) {
+    // Short compact prompt for GET fallback (avoids huge URLs + CORS noise)
     const compact = messages
-      .map((m) => (m.role || "user").toUpperCase() + ": " + String(m.content || ""))
-      .join("\n\n")
-      .slice(0, 3500);
+      .map((m) => {
+        const role = (m.role || "user").toUpperCase();
+        let content = String(m.content || "");
+        if (role === "SYSTEM") content = content.slice(0, 900);
+        else content = content.slice(0, 400);
+        return role + ": " + content;
+      })
+      .join("\n")
+      .slice(0, 1800);
     const url = POLLINATIONS_GET + encodeURIComponent(compact);
-    const res = await fetch(url);
+    let res;
+    try {
+      res = await fetch(url, { mode: "cors", credentials: "omit" });
+    } catch (err) {
+      throw new Error(friendlyTextApiError(err, "Pollinations GET"));
+    }
     if (!res.ok) throw new Error("Pollinations GET " + res.status);
     const text = await res.text();
-    if (!String(text).trim()) throw new Error("Empty reply");
+    if (!String(text).trim()) throw new Error("Empty reply (GET)");
     return String(text).trim();
   }
 
@@ -2404,15 +2568,30 @@
     const mode = getAgentMode();
     const c = current();
     const messages = buildAgentMessages(mode, userText, c);
-    try {
-      return await callPollinationsChat(messages);
-    } catch (err) {
+    const errors = [];
+    const models = ["openai", "openai-fast", "mistral"];
+    for (let i = 0; i < models.length; i++) {
       try {
-        return await callPollinationsGet(messages);
-      } catch (err2) {
-        throw new Error((err2 && err2.message) || (err && err.message) || "Agent request failed");
+        return await callPollinationsChat(messages, models[i]);
+      } catch (err) {
+        errors.push(err);
       }
     }
+    try {
+      return await callGenPollinationsChat(messages);
+    } catch (err) {
+      errors.push(err);
+    }
+    try {
+      return await callPollinationsGet(messages);
+    } catch (err) {
+      errors.push(err);
+    }
+    const last = errors[errors.length - 1];
+    throw new Error(
+      friendlyTextApiError(last, "Agent text") ||
+        "All text endpoints failed — try again in a moment."
+    );
   }
 
   function syncAgentModeSeg() {
@@ -2446,7 +2625,10 @@
         const imgHtml = hasImg
           ? '<img class="agent-chat-img" src="' +
             esc(m.imageUrl) +
-            '" alt="Generated" loading="lazy" referrerpolicy="no-referrer" />'
+            '" alt="Generated" loading="lazy" referrerpolicy="no-referrer" ' +
+            'onerror="this.classList.add(\'is-broken\');this.alt=\'\';' +
+            'var f=this.nextElementSibling;if(f)f.hidden=false;" />' +
+            '<span class="agent-img-fail" hidden>Image failed to load</span>'
           : "";
         return (
           '<div class="agent-bubble ' +
@@ -2559,8 +2741,9 @@
   }
 
   async function agentAskModeScene(userText, c) {
-    const skills = buildSkillsBlock("studio");
-    const system =
+    let skills = buildSkillsBlock("studio");
+    if (skills.length > 1200) skills = skills.slice(0, 1199) + "…";
+    let system =
       "You write short image scene briefs for Lumora Personal (adult fictional 21+ only). " +
       "Return ONLY two lines, nothing else — no intro, no markdown:\n" +
       "MODE: soft|suggestive|nsfw\n" +
@@ -2569,19 +2752,35 @@
       "Infer MODE from the user request. Keep SCENE under 40 words." +
       (skills ? "\n\n" + skills : "") +
       (c && c.name ? "\nCharacter in use: " + c.name + " (identity is face-locked elsewhere — do not restate face)." : "");
+    if (system.length > AGENT_SYSTEM_MAX) {
+      system = system.slice(0, AGENT_SYSTEM_MAX - 1) + "…";
+    }
     const messages = [
       { role: "system", content: system },
       { role: "user", content: String(userText || "").slice(0, 800) },
     ];
-    try {
-      return await callPollinationsChat(messages);
-    } catch (err) {
+    const errors = [];
+    for (const model of ["openai", "openai-fast", "mistral"]) {
       try {
-        return await callPollinationsGet(messages);
-      } catch (err2) {
-        throw new Error((err2 && err2.message) || (err && err.message) || "Prompt build failed");
+        return await callPollinationsChat(messages, model);
+      } catch (err) {
+        errors.push(err);
       }
     }
+    try {
+      return await callGenPollinationsChat(messages);
+    } catch (err) {
+      errors.push(err);
+    }
+    try {
+      return await callPollinationsGet(messages);
+    } catch (err) {
+      errors.push(err);
+    }
+    throw new Error(
+      friendlyTextApiError(errors[errors.length - 1], "Prompt build") ||
+        "Prompt build failed"
+    );
   }
 
   function saveAgentGenToMedia(c, imageUrl, label, notes, aspect) {
@@ -2658,32 +2857,67 @@
       const imagePrompt = buildImagePrompt(c, parsed.scene, parsed.mode);
       setGenLoading(true);
 
-      let imageUrl = null;
+      let chatUrl = null;
+      let mediaUrl = null;
       let used = "horde";
-      let lastErr = null;
+      let hordeErr = null;
+      let pollErr = null;
 
       try {
-        imageUrl = await generateWithHorde(imagePrompt, aspect, parsed.mode);
+        const rawHorde = await generateWithHorde(
+          imagePrompt,
+          aspect,
+          parsed.mode,
+          {
+            onStatus: (t) => {
+              state.agentStatusText = t;
+              renderAgentChat();
+            },
+          }
+        );
+        state.agentStatusText = "Verifying Horde image…";
+        renderAgentChat();
+        const confirmed = await confirmAgentImage(rawHorde);
+        chatUrl = confirmed.chatUrl;
+        mediaUrl = confirmed.mediaUrl;
       } catch (err) {
-        lastErr = err;
+        hordeErr = err;
         // Soft/Suggestive: Horde first for photoreal, Pollinations fallback. NSFW stays on Horde.
         if (parsed.mode !== "nsfw") {
-          state.agentStatusText = "Horde busy — trying Pollinations (free)…";
+          state.agentStatusText = "Horde failed — trying Pollinations (free)…";
           renderAgentChat();
           used = "pollinations";
           const pollUrl = buildPollinationsUrl(imagePrompt, aspect, parsed.mode);
           if (pollUrl.length > 2200) {
-            throw lastErr || new Error("Prompt too long for Pollinations fallback");
+            throw new Error(
+              "Horde failed (" +
+                ((hordeErr && hordeErr.message) || "error") +
+                "); Pollinations URL too long for fallback."
+            );
           }
-          // Keep durable HTTPS URL for chat/media (blob URLs die on reload)
-          imageUrl = pollUrl;
+          try {
+            state.agentStatusText = "Verifying Pollinations image…";
+            renderAgentChat();
+            const confirmed = await confirmAgentImage(pollUrl);
+            chatUrl = confirmed.chatUrl;
+            mediaUrl = confirmed.mediaUrl;
+          } catch (err2) {
+            pollErr = err2;
+            throw new Error(
+              "Horde failed (" +
+                ((hordeErr && hordeErr.message) || "error") +
+                "); Pollinations also failed (" +
+                ((err2 && err2.message) || "image did not load") +
+                "). Tap Generate image to retry."
+            );
+          }
         } else {
           throw err;
         }
       }
 
-      if (!imageUrl) {
-        throw lastErr || new Error("No image returned");
+      if (!chatUrl) {
+        throw hordeErr || pollErr || new Error("No image returned");
       }
 
       const caption =
@@ -2697,16 +2931,16 @@
       next.push({
         role: "assistant",
         content: caption,
-        imageUrl: imageUrl,
+        imageUrl: chatUrl,
         ts: Date.now(),
       });
       setAgentChat(chatMode, next);
-      state.lastGenUrl = imageUrl;
-      lightUpdateGenPreview(imageUrl);
+      state.lastGenUrl = mediaUrl || chatUrl;
+      lightUpdateGenPreview(chatUrl);
       try {
         saveAgentGenToMedia(
           getCharacter(c.id) || c,
-          imageUrl,
+          mediaUrl || chatUrl,
           "Agent · " + parsed.mode + " · " + parsed.scene.slice(0, 40),
           parsed.scene,
           aspect
@@ -2716,12 +2950,12 @@
       toast("Image ready (" + used + ")");
     } catch (err) {
       const msg = (err && err.message) || "Image generation failed";
-      toast(msg + " — tap Generate image to retry");
+      toast(msg);
       const next = getAgentChat(chatMode);
       next.push({
         role: "assistant",
         content:
-          "Couldn't generate that image. " + msg + " Tap Generate image to retry.",
+          "Couldn't generate that image. " + msg,
         ts: Date.now(),
       });
       setAgentChat(chatMode, next);
@@ -2757,7 +2991,15 @@
       next.push({ role: "assistant", content: reply, ts: Date.now() });
       setAgentChat(mode, next);
     } catch (err) {
-      toast((err && err.message) || "Agent failed — try again");
+      const msg = friendlyTextApiError(err, "Agent") || "Agent failed — try again";
+      toast(msg);
+      const next = getAgentChat(mode);
+      next.push({
+        role: "assistant",
+        content: "Couldn't reply right now. " + msg,
+        ts: Date.now(),
+      });
+      setAgentChat(mode, next);
     } finally {
       state.agentLoading = false;
       state.agentStatusText = "";
