@@ -20,6 +20,8 @@
     agentChatStudio: PREFIX + "agent_chat_studio",
     agentChatLila: PREFIX + "agent_chat_lila",
     agentMode: PREFIX + "agent_mode",
+    stylePack: PREFIX + "style_pack",
+    stealListSkillsV1: PREFIX + "steal_list_skills_v1",
   };
 
   const $ = (s, el = document) => el.querySelector(s);
@@ -39,6 +41,8 @@
     genLoading: false,
     agentLoading: false,
     agentStatusText: "",
+    storyboardRunning: false,
+    storyboardAbort: false,
   };
 
   // ——— Starter: Lila Bloom ———
@@ -215,121 +219,205 @@
     ["Vanity", "at a vanity mirror getting ready, soft lighting, intimate portrait"],
   ];
 
-  /** Themed Complete-set style packs (APOB-lite). Tap fills scene + mood. */
-  const QUICK_SETS = [
+
+  /** One-tap preset tiles (GeneratePorn-style). Categories gate NSFW behind NSFW mode. */
+  const PRESET_TILES = [
+    // —— Outfits ——
     {
-      id: "qs-soft-window",
-      title: "Golden window",
-      category: "Soft lifestyle",
-      mood: "soft",
+      id: "pt-outfit-silk",
+      label: "Silk robe morning",
+      category: "Outfits",
+      mood: "suggestive",
+      eta: "~1–3 min · free Horde",
       scene:
-        "Sitting cross-legged on a cushioned window seat, oversized cream knit sweater, soft natural daylight, holding a warm mug, shy smile toward camera, cozy apartment plants in soft bokeh, lifestyle photoreal, cream and blush palette",
+        "Standing in a sunlit bedroom doorway wearing a soft blush silk robe loosely tied, one bare shoulder, bare legs, rose-pink hair in a loose messy bun, shy half-smile, morning light through sheer curtains, intimate casual vibe, soft freckles, cream interior",
     },
     {
-      id: "qs-soft-cafe",
-      title: "Café latte",
-      category: "Soft lifestyle",
+      id: "pt-outfit-knit",
+      label: "Oversized knit",
+      category: "Outfits",
       mood: "soft",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Sitting cross-legged on a cushioned window seat, oversized cream knit sweater slipping off one shoulder, soft natural daylight, holding a warm mug with both hands, shy smile toward camera, cozy apartment plants in soft bokeh, cream and blush palette",
+    },
+    {
+      id: "pt-outfit-lingerie",
+      label: "Pastel lace set",
+      category: "Outfits",
+      mood: "nsfw",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Full-length try-on, soft pink lace lingerie set with tiny bows and matching thigh garters, one hand adjusting a strap, rose-pink hair in a soft ponytail, shy bitten lip, bedroom vanity lights, intimate adult try-on vibe, pastel aesthetic, tasteful sensual NSFW",
+    },
+    {
+      id: "pt-outfit-shirt",
+      label: "Boyfriend shirt only",
+      category: "Outfits",
+      mood: "suggestive",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Wearing only an oversized white boyfriend shirt unbuttoned low, bare legs, standing in a doorway, rose-pink hair, biting lip shyly, soft morning light, intimate adult tease, long bare legs, cream interior, soft freckles",
+    },
+    // —— Poses / Scenes ——
+    {
+      id: "pt-pose-mirror",
+      label: "Mirror selfie",
+      category: "Poses/Scenes",
+      mood: "soft",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Taking a mirror selfie with a phone in a stylish bedroom, casual soft outfit, soft daylight, phone at chest height, shy eye contact in reflection, lifestyle influencer aesthetic, natural skin texture",
+    },
+    {
+      id: "pt-pose-overshoulder",
+      label: "Over-shoulder glance",
+      category: "Poses/Scenes",
+      mood: "soft",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Looking back over her shoulder toward camera, soft cream sundress, rose-pink hair cascading down her back, gentle shy smile, warm golden hour light, outdoor balcony, soft bokeh, intimate portrait framing",
+    },
+    {
+      id: "pt-pose-window",
+      label: "Rainy window",
+      category: "Poses/Scenes",
+      mood: "suggestive",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Standing by a rainy window in sheer blush lingerie, city lights soft through wet glass, rose-pink hair, one hand on the glass, looking back shyly, cool blue and warm lamp mix, intimate adult mood, romantic soft NSFW framing, freckles visible",
+    },
+    {
+      id: "pt-pose-kneeling",
+      label: "Kneeling pillow talk",
+      category: "Poses/Scenes",
+      mood: "nsfw",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Kneeling on a soft bed facing camera, wearing delicate blush sheer lingerie with tiny bows, rose-pink hair in loose waves, hands resting shyly on thighs, looking up with soft bedroom eyes, warm pink lamp glow, intimate NSFW, sweet and consensual mood, cream sheets behind her",
+    },
+    // —— Soft ——
+    {
+      id: "pt-soft-cafe",
+      label: "Café latte",
+      category: "Soft",
+      mood: "soft",
+      eta: "~1–3 min · free Horde",
       scene:
         "Sitting in a cozy café holding a latte, relaxed soft smile, warm interior light, casual chic outfit, iPhone lifestyle photo, natural skin texture, shallow depth of field",
     },
     {
-      id: "qs-soft-park",
-      title: "Park picnic",
-      category: "Soft lifestyle",
+      id: "pt-soft-picnic",
+      label: "Park picnic",
+      category: "Soft",
       mood: "soft",
+      eta: "~1–3 min · free Horde",
       scene:
         "Sitting on a picnic blanket in a quiet park, soft sundress, gentle wind in hair, holding a flower near face, dappled sunlight, dreamy bokeh, wholesome lifestyle influencer aesthetic",
     },
     {
-      id: "qs-sug-robe",
-      title: "Silk robe mirror",
+      id: "pt-soft-couch",
+      label: "Rainy couch",
+      category: "Soft",
+      mood: "soft",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Curled on a sofa under a blanket, oversized soft hoodie, rain on the window behind her, holding a book to her chest, soft freckles visible, gentle smile, lavender and cream room tones, cozy hygge mood, natural soft lighting",
+    },
+    {
+      id: "pt-soft-vanity",
+      label: "Vanity getting ready",
+      category: "Soft",
+      mood: "soft",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Sitting at a vanity mirror tying a soft ribbon in her rose-pink hair, wearing a cream lace bralette and soft skirt, pearl earrings, bottles and perfume softly blurred, looking back over her shoulder with a shy flirty glance, pastel aesthetic, gentle film grain",
+    },
+    // —— Suggestive ——
+    {
+      id: "pt-sug-robe",
+      label: "Silk robe mirror",
       category: "Suggestive",
       mood: "suggestive",
+      eta: "~1–3 min · free Horde",
       scene:
         "Standing in front of a tall mirror, soft blush silk robe loosely tied, one shoulder bare, warm bathroom steam haze, phone at chest height, shy eye contact in reflection, soft lamp light, intimate elegant",
     },
     {
-      id: "qs-sug-shirt",
-      title: "Oversized shirt AM",
+      id: "pt-sug-kitchen",
+      label: "Kitchen AM tease",
       category: "Suggestive",
       mood: "suggestive",
+      eta: "~1–3 min · free Horde",
       scene:
-        "Standing in a sunlit kitchen wearing only an oversized white button-up shirt half-buttoned, bare legs, loose messy bun, holding fruit, shy half-smile, morning light through sheer curtains, intimate casual vibe",
+        "Standing in a sunlit kitchen wearing only an oversized white button-up shirt half-buttoned, bare legs, loose messy bun, holding a strawberry, shy half-smile, morning light through sheer curtains, intimate casual vibe",
     },
     {
-      id: "qs-sug-vanity",
-      title: "Vanity lace",
+      id: "pt-sug-stocking",
+      label: "Stocking peel",
       category: "Suggestive",
       mood: "suggestive",
+      eta: "~1–3 min · free Horde",
       scene:
-        "Sitting at a vanity mirror adjusting soft lace bralette straps, pearl earrings, looking back over shoulder with shy flirty glance, warm vanity bulbs, pastel aesthetic, gentle film grain",
+        "Sitting on the bed edge rolling down a soft blush sheer stocking, pastel lace garter visible, rose-pink hair falling over one eye, shy focused expression, warm bedroom lamp, intimate undress detail, adult sensual mood, cream and pink palette, cute not crude",
     },
     {
-      id: "qs-nsfw-sheets",
-      title: "Bedtime whisper",
-      category: "NSFW soft",
+      id: "pt-sug-backless",
+      label: "Backless night slip",
+      category: "Suggestive",
+      mood: "suggestive",
+      eta: "~1–3 min · free Horde",
+      scene:
+        "Standing with back to camera looking over her shoulder, wearing a soft satin blush night slip with open back, rose-pink hair cascading down bare spine, soft freckles on shoulders, dim romantic lighting, intimate adult evening, elegant sensual, shy glance",
+    },
+    // —— NSFW (gated) ——
+    {
+      id: "pt-nsfw-sheets",
+      label: "Bedtime whisper",
+      category: "NSFW",
       mood: "nsfw",
+      eta: "~1–3 min · free Horde",
       scene:
         "Lying on soft cream sheets in delicate pastel lace lingerie, hair fanned across pillow, shy bedroom eyes, one hand at collarbone, warm pink lamp, romantic intimate adult mood, soft skin detail, consensual soft NSFW",
     },
     {
-      id: "qs-nsfw-steam",
-      title: "After-shower",
-      category: "NSFW soft",
+      id: "pt-nsfw-steam",
+      label: "After-shower steam",
+      category: "NSFW",
       mood: "nsfw",
+      eta: "~1–3 min · free Horde",
       scene:
         "Wrapped in a soft towel loosely at the chest, wet hair dripping, steam in a warm bathroom, glancing up shyly, water droplets on collarbones, intimate adult atmosphere, soft diffused light, sensual and cute",
     },
     {
-      id: "qs-fit-squat",
-      title: "Gym squat rack",
-      category: "Fitness photoreal",
-      mood: "soft",
+      id: "pt-nsfw-bathtub",
+      label: "Bathtub petals",
+      category: "NSFW",
+      mood: "nsfw",
+      eta: "~1–3 min · free Horde",
       scene:
-        "Photoreal fitness photo at squat rack in modern gym, sports bra and high-waist leggings, athletic sheen on skin, dramatic side light, slight sweat, confident form check, raw photo pores, natural muscle definition, iPhone candid quality",
+        "Relaxing in a warm bathtub scattered with soft pink rose petals, water at mid-chest, wet rose-pink hair clinging to neck and shoulders, soft freckles, shy smile, candlelight reflections on wet skin, intimate adult atmosphere, romantic and tender, creamy pastel tones",
     },
     {
-      id: "qs-fit-mirror",
-      title: "Gym mirror flex",
-      category: "Fitness photoreal",
-      mood: "suggestive",
+      id: "pt-nsfw-invite",
+      label: "Bed invitation",
+      category: "NSFW",
+      mood: "nsfw",
+      eta: "~1–3 min · free Horde",
       scene:
-        "Mirror selfie in gym bathroom, sports bra and bike shorts, post-workout glow, oiled skin highlights subtle, phone in hand, low angle, raw photo pores, photoreal fitness influencer look, fluorescent + window mix",
-    },
-    {
-      id: "qs-fit-outdoor",
-      title: "Sunrise run",
-      category: "Fitness photoreal",
-      mood: "soft",
-      scene:
-        "Outdoor sunrise jog pause on a path, running outfit, wind-tossed hair, golden hour backlight, slight sweat on collarbones, photoreal fitness candid, natural skin texture, shallow DOF, energetic lifestyle",
-    },
-    {
-      id: "qs-ugc-iphone",
-      title: "iPhone candid couch",
-      category: "UGC iPhone candid",
-      mood: "soft",
-      scene:
-        "Casual iPhone candid on a couch at home, oversized shirt, soft lamp, looking at phone then glancing up, imperfect framing, raw photo pores, natural skin, slight noise, authentic UGC lifestyle feel",
-    },
-    {
-      id: "qs-ugc-balcony",
-      title: "Balcony golden",
-      category: "UGC iPhone candid",
-      mood: "soft",
-      scene:
-        "Standing on a small balcony at golden hour, casual summer outfit, phone selfie arm extended, city soft behind, wind in hair, raw photo pores, authentic iPhone UGC, warm backlight flare",
-    },
-    {
-      id: "qs-ugc-bathroom",
-      title: "Bathroom steam UGC",
-      category: "UGC iPhone candid",
-      mood: "suggestive",
-      scene:
-        "iPhone mirror selfie in steamy bathroom, towel or silk robe, foggy mirror edges, soft overhead light, candid imperfect crop, raw photo pores, natural skin, intimate UGC vibe",
+        "Fully nude on cream sheets, legs softly parted, one knee bent, covering almost nothing with a shy hand then moving it away, rose-pink hair, flushed face, looking at camera with embarrassed desire, warm pink lamp, explicit adult NSFW, soft cute expression, detailed skin, intimate and consensual",
     },
   ];
+
+  /** Legacy alias — Quick sets map onto PRESET_TILES for older callers. */
+  const QUICK_SETS = PRESET_TILES.map((t) => ({
+    id: t.id,
+    title: t.label,
+    category: t.category,
+    mood: t.mood,
+    scene: t.scene,
+    eta: t.eta,
+  }));
 
   const PROMPT_PILLS = [
     {
@@ -1021,26 +1109,128 @@
   const HORDE_NEGATIVE =
     "extra faces, multiple heads, fused faces, melted skin, blob, amorphous, mutated, deformed, disfigured, bad anatomy, bad hands, extra limbs, duplicate, clone, watermark, text, logo, ugly, lowres, blurry, censored";
 
+  /** OurDream-style engine packs: Photoreal (default) / Cinema / Anime */
+  const STYLE_PACKS = {
+    photoreal: {
+      id: "photoreal",
+      label: "Photoreal",
+      modelsSoft: null, // filled below from HORDE_MODELS_SOFT
+      modelsNsfw: null,
+      leadSoft:
+        "photorealistic portrait, raw photo, natural skin texture, soft lighting, single person, looking at viewer, coherent anatomy, sharp focus, 85mm",
+      leadNsfw:
+        "photorealistic, raw photo, natural skin texture, skin pores, single adult woman, detailed face, coherent anatomy, one head, sharp focus, 85mm",
+      negativeExtra: "cartoon, anime, illustration, 3d render, plastic skin",
+      clipSkip: 1,
+    },
+    cinema: {
+      id: "cinema",
+      label: "Cinema",
+      modelsSoft: [
+        "Juggernaut XL",
+        "AlbedoBase XL 3.1",
+        "AlbedoBase XL (SDXL)",
+        "ICBINP XL",
+        "ICBINP - I Can't Believe It's Not Photography",
+        "AbsoluteReality",
+        "Realistic Vision",
+        "Analog Madness",
+        "Deliberate 3.0",
+        "Epic Diffusion",
+      ],
+      modelsNsfw: [
+        "Juggernaut XL",
+        "AlbedoBase XL 3.1",
+        "AlbedoBase XL (SDXL)",
+        "ICBINP XL",
+        "ICBINP - I Can't Believe It's Not Photography",
+        "AbsoluteReality",
+        "Realistic Vision",
+        "Analog Madness",
+        "Pony Realism",
+        "CyberRealistic Pony",
+        "Babes",
+        "Photon",
+      ],
+      leadSoft:
+        "cinematic still, film grain, anamorphic lens flare, dramatic lighting, shallow depth of field, movie still, color graded, 35mm, single person, coherent anatomy",
+      leadNsfw:
+        "cinematic still, film grain, dramatic rim light, shallow DOF, movie still, adult scene, coherent anatomy, detailed face, 35mm, color graded",
+      negativeExtra: "flat lighting, oversaturated, cartoon, anime, snapchat filter, selfie stick",
+      clipSkip: 1,
+    },
+    anime: {
+      id: "anime",
+      label: "Anime",
+      modelsSoft: [
+        "WAI-NSFW-illustrious-SDXL",
+        "Pony Realism",
+        "CyberRealistic Pony",
+        "AlbedoBase XL 3.1",
+        "Juggernaut XL",
+      ],
+      modelsNsfw: [
+        "WAI-NSFW-illustrious-SDXL",
+        "Pony Realism",
+        "CyberRealistic Pony",
+        "AlbedoBase XL 3.1",
+        "Juggernaut XL",
+        "Babes",
+      ],
+      leadSoft:
+        "anime illustration, clean lineart, soft cel shading, detailed eyes, vibrant colors, single character, beautiful lighting",
+      leadNsfw:
+        "anime illustration, detailed eyes, soft shading, adult content, coherent anatomy, single character, beautiful lighting",
+      negativeExtra: "photorealistic, raw photo, 3d render, western cartoon, ugly face, extra limbs",
+      clipSkip: 2,
+    },
+  };
+  // Photoreal pack reuses the established Horde model lists
+  STYLE_PACKS.photoreal.modelsSoft = HORDE_MODELS_SOFT.slice();
+  STYLE_PACKS.photoreal.modelsNsfw = HORDE_MODELS_NSFW.slice();
+
+  function getStylePackId() {
+    const el = $("#stylePackSeg .on");
+    const fromUi = el && el.dataset.v;
+    let v = fromUi || load(KEYS.stylePack, "photoreal") || "photoreal";
+    if (!STYLE_PACKS[v]) v = "photoreal";
+    return v;
+  }
+  function getStylePack() {
+    return STYLE_PACKS[getStylePackId()] || STYLE_PACKS.photoreal;
+  }
+  function setStylePack(id) {
+    const v = STYLE_PACKS[id] ? id : "photoreal";
+    save(KEYS.stylePack, v);
+    $$("#stylePackSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+    // Mirror into Agent engines panel if present
+    $$("#agentStylePackSeg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+    return v;
+  }
+
+
   function defaultHordeModels(mode) {
-    // soft + suggestive: photoreal; nsfw: photoreal first, WAI anime only secondary
-    if (mode === "nsfw") return HORDE_MODELS_NSFW.slice();
-    return HORDE_MODELS_SOFT.slice();
+    const pack = getStylePack();
+    const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
+    if (m === "nsfw") {
+      return (pack.modelsNsfw || HORDE_MODELS_NSFW).slice();
+    }
+    return (pack.modelsSoft || HORDE_MODELS_SOFT).slice();
   }
 
   /** Shape an SD-style positive + negative for AI Horde. Returns `positive ### negative`. */
   function buildHordePrompt(imagePrompt, mode) {
     const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
-    const lead =
-      m === "nsfw"
-        ? "photorealistic, raw photo, natural skin texture, skin pores, single adult woman, detailed face, coherent anatomy, one head, sharp focus, 85mm"
-        : "photorealistic portrait, raw photo, natural skin texture, soft lighting, single person, looking at viewer, coherent anatomy, sharp focus, 85mm";
+    const pack = getStylePack();
+    const lead = m === "nsfw" ? pack.leadNsfw : pack.leadSoft;
     let positive = lead + ", " + String(imagePrompt || "").replace(/\s+/g, " ").trim();
     // Cap positive before negative so total stays reasonable for workers
     const maxPos = 1400;
     if (positive.length > maxPos) {
       positive = positive.slice(0, maxPos).replace(/\s+\S*$/, "") + "…";
     }
-    return positive + " ### " + HORDE_NEGATIVE;
+    const negExtra = pack.negativeExtra ? ", " + pack.negativeExtra : "";
+    return positive + " ### " + HORDE_NEGATIVE + negExtra;
   }
 
   function mediaSrc(m) {
@@ -1298,10 +1488,12 @@
     const allowNsfw = mode === "suggestive" || mode === "nsfw";
     const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
     const models = modelOverride ? [modelOverride] : defaultHordeModels(m);
-    // Photoreal defaults use clip_skip 1; only user anime/pony override gets 2
+    const pack = getStylePack();
+    // Photoreal/Cinema clip_skip 1; Anime pack 2; user anime/pony override also 2
     const animeOrPony = !!(
-      modelOverride &&
-      /pony|illustrious|anime|hentai|orange.?mix|wai-nsfw/i.test(modelOverride)
+      (modelOverride &&
+        /pony|illustrious|anime|hentai|orange.?mix|wai-nsfw/i.test(modelOverride)) ||
+      pack.id === "anime"
     );
     const params = {
       width,
@@ -1310,7 +1502,7 @@
       steps: 32,
       cfg_scale: 7,
       sampler_name: "k_euler_a",
-      clip_skip: animeOrPony ? 2 : 1,
+      clip_skip: animeOrPony ? 2 : pack.clipSkip || 1,
     };
     if (seedRaw && /^\d+$/.test(seedRaw)) params.seed = seedRaw;
     const shaped = buildHordePrompt(prompt, m);
@@ -1712,10 +1904,233 @@
     });
   }
 
+
+  /** Director-ish angle variants for photo-set / storyboard (4–6 frames). */
+  const STORYBOARD_ANGLES = [
+    {
+      id: "front",
+      label: "Front",
+      fragment:
+        "camera angle: straight-on front view, eye-level, subject facing camera, full clear face, centered framing, portrait composition",
+    },
+    {
+      id: "three-quarter",
+      label: "3/4",
+      fragment:
+        "camera angle: three-quarter view, slight turn of body, face clearly visible, cinematic framing, soft depth of field",
+    },
+    {
+      id: "side",
+      label: "Side",
+      fragment:
+        "camera angle: side profile view, elegant silhouette, soft rim light on cheek and hair, intimate profile portrait",
+    },
+    {
+      id: "closeup",
+      label: "Close-up",
+      fragment:
+        "camera angle: close-up crop face and shoulders, shallow depth of field, intimate eye contact, detailed skin and freckles, 85mm feel",
+    },
+    {
+      id: "mirror",
+      label: "Mirror",
+      fragment:
+        "camera angle: full-length mirror selfie reflection, phone held at chest height, bathroom or bedroom mirror, candid framing",
+    },
+    {
+      id: "over-shoulder",
+      label: "Over-shoulder",
+      fragment:
+        "camera angle: over-the-shoulder glance back at camera, hair cascading down back, soft look over shoulder, intimate rear three-quarter",
+    },
+  ];
+
+  function expandStoryboardScenes(baseScene, count) {
+    const n = Math.max(4, Math.min(6, count || 6));
+    const angles = STORYBOARD_ANGLES.slice(0, n);
+    const base = String(baseScene || "").trim();
+    return angles.map((a) => ({
+      id: a.id,
+      label: a.label,
+      scene: base + ", " + a.fragment,
+    }));
+  }
+
+  function saveStoryboardFrameToMedia(c, imageUrl, label, notes, aspect, mode, angleId, setId) {
+    if (!c || !imageUrl) return;
+    const media = [
+      {
+        id: uid("m"),
+        label: String(label || "Storyboard frame").slice(0, 80),
+        notes: String(notes || "").slice(0, 500),
+        aspect: aspect || "3:4",
+        imageDataUrl: null,
+        imageUrl: imageUrl,
+        createdAt: new Date().toISOString(),
+        source: "storyboard",
+        tags: ["storyboard", angleId || "frame"].filter(Boolean),
+        mode: mode || "soft",
+        storyboardSetId: setId || null,
+        type: "storyboard",
+      },
+      ...(c.media || []),
+    ];
+    updateCharacter(c.id, { media });
+  }
+
+  function setStoryboardProgress(text, current, total) {
+    const el = $("#storyboardProgress");
+    if (!el) return;
+    if (!text) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    const frac = total ? " " + current + "/" + total : "";
+    el.textContent = text + frac;
+  }
+
+  function renderStoryboardGrid(frames) {
+    const grid = $("#storyboardGrid");
+    if (!grid) return;
+    if (!frames || !frames.length) {
+      grid.hidden = true;
+      grid.innerHTML = "";
+      return;
+    }
+    grid.hidden = false;
+    grid.innerHTML = frames
+      .map((f) => {
+        if (f.url) {
+          return (
+            '<figure class="sb-frame ok"><img src="' +
+            esc(f.url) +
+            '" alt="' +
+            esc(f.label) +
+            '" loading="lazy"/><figcaption>' +
+            esc(f.label) +
+            "</figcaption></figure>"
+          );
+        }
+        return (
+          '<figure class="sb-frame fail"><div class="sb-fail">' +
+          esc(f.error || "Failed") +
+          "</div><figcaption>" +
+          esc(f.label) +
+          "</figcaption></figure>"
+        );
+      })
+      .join("");
+  }
+
+  async function runStoryboardSet() {
+    const c = current();
+    if (!c) return;
+    if (state.genLoading || state.storyboardRunning) {
+      toast("Already generating — wait for the current job");
+      return;
+    }
+    const scene = ($("#sceneInput") && $("#sceneInput").value.trim()) || "";
+    if (!scene) {
+      toast("Describe a scene (or tap a preset) first");
+      $("#sceneInput") && $("#sceneInput").focus();
+      return;
+    }
+    const aspect = ($("#aspectSeg .on") && $("#aspectSeg .on").dataset.v) || "3:4";
+    const mode = getGenMode();
+    const variants = expandStoryboardScenes(scene, 6);
+    const setId = uid("sb");
+    state.storyboardRunning = true;
+    state.storyboardAbort = false;
+    const btn = $("#storyboardBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add("is-loading");
+    }
+    const results = [];
+    let okCount = 0;
+    let failCount = 0;
+    setStoryboardProgress("Storyboard queuing…", 0, variants.length);
+    renderStoryboardGrid([]);
+
+    for (let i = 0; i < variants.length; i++) {
+      if (state.storyboardAbort) break;
+      const v = variants[i];
+      setStoryboardProgress("Storyboard frame", i + 1, variants.length);
+      toast("Storyboard " + (i + 1) + "/" + variants.length + " · " + v.label);
+      const imagePrompt = buildImagePrompt(c, v.scene, mode);
+      try {
+        const url = await generateWithHorde(imagePrompt, aspect, mode, {
+          onStatus: (t) => setStoryboardProgress(t + " · frame", i + 1, variants.length),
+        });
+        saveStoryboardFrameToMedia(
+          getCharacter(c.id) || c,
+          url,
+          "SB " + v.label + " · " + scene.slice(0, 40),
+          v.scene,
+          aspect,
+          mode,
+          v.id,
+          setId
+        );
+        results.push({ label: v.label, url, id: v.id });
+        okCount++;
+        // Show latest in main preview too
+        lightUpdateGenPreview(url);
+        state.lastGenUrl = url;
+        renderStoryboardGrid(results);
+      } catch (err) {
+        failCount++;
+        results.push({
+          label: v.label,
+          url: null,
+          id: v.id,
+          error: (err && err.message) || "Failed",
+        });
+        renderStoryboardGrid(results);
+        toast(
+          "Frame " +
+            (i + 1) +
+            "/" +
+            variants.length +
+            " failed — keeping completed frames"
+        );
+      }
+    }
+
+    state.storyboardRunning = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove("is-loading");
+    }
+    renderMedia();
+    if (okCount) {
+      setStoryboardProgress(
+        "Storyboard done · " + okCount + " saved" + (failCount ? ", " + failCount + " failed" : ""),
+        okCount,
+        variants.length
+      );
+      toast(
+        "Storyboard: " +
+          okCount +
+          "/" +
+          variants.length +
+          " saved to Media" +
+          (failCount ? " (" + failCount + " failed)" : "")
+      );
+    } else {
+      setStoryboardProgress("Storyboard failed — no frames saved", 0, variants.length);
+      toast("Storyboard failed — no frames saved. Try again or check Horde.");
+    }
+  }
+
+
   async function generateSceneImage() {
     const c = current();
     if (!c) return;
-    if (state.genLoading) return;
+    if (state.genLoading || state.storyboardRunning) return;
+
     const scene = $("#sceneInput").value.trim();
     if (!scene) {
       toast("Describe a scene first");
@@ -1783,7 +2198,13 @@
             '" style="aspect-ratio:' +
             ratio +
             '"><span class="tag">' +
-            (m.type === "video-pending" ? "Video…" : m.imageUrl ? "Gen" : "Note") +
+            (m.type === "video-pending"
+              ? "Video…"
+              : m.type === "storyboard" || (m.tags && m.tags.indexOf("storyboard") >= 0)
+                ? "SB"
+                : m.imageUrl
+                  ? "Gen"
+                  : "Note") +
             '</span><img src="' +
             esc(src) +
             '" alt="' +
@@ -1902,34 +2323,94 @@
     return shortIdentity;
   }
 
+  function presetTilesForMode(mode) {
+    const m = mode === "suggestive" || mode === "nsfw" ? mode : "soft";
+    // NSFW category only when NSFW mode is on; otherwise hide NSFW tiles
+    return PRESET_TILES.filter((t) => {
+      if (t.category === "NSFW" || t.mood === "nsfw") return m === "nsfw";
+      return true;
+    });
+  }
+
   function renderQuickSets() {
     const root = $("#quickSets");
     if (!root) return;
-    root.innerHTML = QUICK_SETS.map(
-      (q) =>
-        '<button type="button" class="quick-set-card" data-qs="' +
-        esc(q.id) +
-        '"><span class="qs-cat">' +
-        esc(q.category) +
-        '</span><span class="qs-title">' +
-        esc(q.title) +
-        '</span><span class="qs-mood">' +
-        esc(q.mood) +
-        "</span></button>"
-    ).join("");
+    const mode = getGenMode();
+    const tiles = presetTilesForMode(mode);
+    const order = ["Outfits", "Poses/Scenes", "Soft", "Suggestive", "NSFW"];
+    const byCat = {};
+    tiles.forEach((t) => {
+      if (!byCat[t.category]) byCat[t.category] = [];
+      byCat[t.category].push(t);
+    });
+    const cats = order.filter((c) => byCat[c] && byCat[c].length);
+    root.innerHTML = cats
+      .map((cat) => {
+        const nsfwGate =
+          cat === "NSFW"
+            ? '<span class="preset-cat-gate">NSFW mode</span>'
+            : "";
+        return (
+          '<div class="preset-cat" data-cat="' +
+          esc(cat) +
+          '"><div class="preset-cat-head"><span class="preset-cat-label">' +
+          esc(cat) +
+          "</span>" +
+          nsfwGate +
+          '</div><div class="preset-tile-row">' +
+          byCat[cat]
+            .map(
+              (t) =>
+                '<button type="button" class="preset-tile" data-pt="' +
+                esc(t.id) +
+                '" data-mood="' +
+                esc(t.mood) +
+                '"><span class="pt-label">' +
+                esc(t.label) +
+                '</span><span class="pt-meta"><span class="pt-mood">' +
+                esc(t.mood) +
+                '</span><span class="pt-eta">' +
+                esc(t.eta || "~1–3 min · free Horde") +
+                "</span></span></button>"
+            )
+            .join("") +
+          "</div></div>"
+        );
+      })
+      .join("");
+  }
+
+  function applyPresetTile(id, autoGenerate) {
+    const t = PRESET_TILES.find((x) => x.id === id);
+    if (!t) return;
+    // NSFW tiles require NSFW mode — auto-switch with clear toast
+    if ((t.mood === "nsfw" || t.category === "NSFW") && getGenMode() !== "nsfw") {
+      setGenMode("nsfw");
+      toast("Switched to NSFW for this preset");
+    } else if (t.mood === "suggestive" && getGenMode() === "soft") {
+      setGenMode("suggestive");
+    } else if (t.mood && t.mood !== "nsfw") {
+      // keep current if already suggestive/nsfw for soft tiles
+      if (getGenMode() === "soft" || t.mood === "soft") setGenMode(t.mood);
+    }
+    const sceneEl = $("#sceneInput");
+    if (sceneEl) sceneEl.value = t.scene;
+    $$(".preset-tile").forEach((el) => el.classList.toggle("on", el.dataset.pt === id));
+    $("#presets .chip").forEach((x) => x.classList.remove("on"));
+    updateFullPreview();
+    const genBtn = $("#generateImageBtn");
+    if (genBtn) {
+      genBtn.classList.add("pulse-once");
+      setTimeout(() => genBtn.classList.remove("pulse-once"), 1200);
+    }
+    toast("Preset: " + t.label);
+    if (autoGenerate) {
+      generateSceneImage();
+    }
   }
 
   function applyQuickSet(id) {
-    const q = QUICK_SETS.find((x) => x.id === id);
-    if (!q) return;
-    $("#sceneInput").value = q.scene;
-    setGenMode(q.mood);
-    $$("#quickSets .quick-set-card").forEach((el) =>
-      el.classList.toggle("on", el.dataset.qs === id)
-    );
-    $$("#presets .chip").forEach((x) => x.classList.remove("on"));
-    updateFullPreview();
-    toast("Quick set: " + q.title);
+    applyPresetTile(id, false);
   }
 
   function renderPromptPills() {
@@ -1968,8 +2449,8 @@
       return;
     }
     ta.value = cur ? cur.replace(/[,\s]+$/, "") + ", " + frag : frag;
-    $$("#presets .chip").forEach((x) => x.classList.remove("on"));
-    $$("#quickSets .quick-set-card").forEach((x) => x.classList.remove("on"));
+    $("#presets .chip").forEach((x) => x.classList.remove("on"));
+    $$(".preset-tile").forEach((x) => x.classList.remove("on"));
     const btn = document.querySelector('.prompt-pill[data-pill="' + frag.replace(/"/g, "") + '"]');
     if (btn) btn.classList.add("used");
     updateFullPreview();
@@ -2086,6 +2567,36 @@
       description: "Agent owns Image Engine + Video stub — ask to generate",
       body:
         "The Agent owns named engines (not just Studio coaching). Image Engine (ready): free AI Horde first for Soft/Suggestive/NSFW, Pollinations Soft/Suggestive fallback, face-lock — ask “generate an image of…” or tap Generate image. Optional free Horde key (still $0) speeds queues. Video Engine (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent engines over opening the Studio Generate tab. Never invent paid free video or claim Seedance works free.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+  ];
+
+  const STEAL_LIST_AGENT_SKILLS = [
+    {
+      id: "style-packs",
+      name: "Style packs",
+      description: "Photoreal / Cinema / Anime Horde packs",
+      body:
+        "Style packs (OurDream-style): Photoreal (default), Cinema, Anime. Each pack sets Horde model preference list + positive lead tags + negative extras. User picks the pack near Generate / Agent engines; it persists in localStorage. Wire into buildHordePrompt / defaultHordeModels / Agent Image Engine. Free only — Horde + Pollinations. Prefer Photoreal for Lila UGC; Cinema for dramatic stills; Anime for illustration.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "preset-tiles",
+      name: "Preset tiles",
+      description: "One-tap scene presets with ETA chips",
+      body:
+        "Preset tiles on Generate: Outfits, Poses/Scenes, Soft, Suggestive, NSFW (NSFW section only when NSFW mode is on). Each tile fills the scene box with a full prompt fragment and shows ~1–3 min · free Horde. Tap fills + highlights Generate; optional one-tap generate. Presets operate on the character Face-lock / identity — fictional adults 21+ only, never undress-of-real-stranger uploads.",
+      enabled: true,
+      modes: ["studio", "both"],
+    },
+    {
+      id: "storyboard-set",
+      name: "Storyboard set",
+      description: "Photo set 4–6 angle variants via Horde",
+      body:
+        "Storyboard / Photo set (4–6): take current scene → expand into front, 3/4, side, close-up, mirror, over-shoulder with Director framing. Queue Horde jobs sequentially with progress N/6; save each success into Media tagged storyboard. If Horde fails mid-set, keep completed frames and toast failures — never fake images. Free Horde only.",
       enabled: true,
       modes: ["studio", "both"],
     },
@@ -2331,9 +2842,12 @@
     }
     // Merge taught skill packs if missing by id (never wipe user skills)
     const have = new Set((list || []).map((s) => s.id));
-    const extras = [...APOB_AGENT_SKILLS, ...GROK_NSFW_AGENT_SKILLS, ...AGENT_ENGINES_SKILLS].filter(
-      (s) => !have.has(s.id)
-    );
+    const extras = [
+      ...APOB_AGENT_SKILLS,
+      ...GROK_NSFW_AGENT_SKILLS,
+      ...AGENT_ENGINES_SKILLS,
+      ...STEAL_LIST_AGENT_SKILLS,
+    ].filter((s) => !have.has(s.id));
     if (extras.length) {
       setAgentSkills([...(list || []), ...extras.map((s) => ({ ...s }))]);
       list = getAgentSkills();
@@ -2409,6 +2923,16 @@
       setAgentSkills(list2);
       list = list2;
       save(KEYS.groqSkillsV1, true);
+    }
+    // One-shot: merge Steal List W1–2 skills if missing
+    if (!load(KEYS.stealListSkillsV1, false)) {
+      const have3 = new Set((list || []).map((s) => s.id));
+      const add = STEAL_LIST_AGENT_SKILLS.filter((s) => !have3.has(s.id));
+      if (add.length) {
+        setAgentSkills([...(list || []), ...add.map((s) => ({ ...s }))]);
+        list = getAgentSkills();
+      }
+      save(KEYS.stealListSkillsV1, true);
     }
   }
   function skillApplies(skill, mode) {
@@ -3160,8 +3684,10 @@
       .map((eng) => {
         const ready = eng.status === "ready";
         const badge = ready ? "ready" : "stub";
+        const packLabel = (typeof getStylePack === "function" && getStylePack().label) || "Photoreal";
         const detail = ready
-          ? "Free AI Horde first (Soft/Suggestive/NSFW) · Pollinations fallback · face-lock"
+          ? "Free AI Horde first (Soft/Suggestive/NSFW) · Pollinations fallback · face-lock · style " +
+            packLabel
           : "Free stub — no Seedance/APOB-quality video without keys/payment yet";
         return (
           '<div class="agent-engine-row">' +
@@ -3179,6 +3705,23 @@
         );
       })
       .join("");
+    const styleRow =
+      '<div class="agent-engine-row agent-style-pack-row">' +
+      '<span class="agent-engine-name">Style pack</span>' +
+      '<span class="agent-engine-badge ready">' +
+      esc((getStylePack() && getStylePack().label) || "Photoreal") +
+      "</span>" +
+      '<div class="seg agent-style-seg" id="agentStylePackSeg" role="radiogroup" aria-label="Style pack">' +
+      '<button type="button" data-v="photoreal"' +
+      (getStylePackId() === "photoreal" ? ' class="on"' : "") +
+      ">Photoreal</button>" +
+      '<button type="button" data-v="cinema"' +
+      (getStylePackId() === "cinema" ? ' class="on"' : "") +
+      ">Cinema</button>" +
+      '<button type="button" data-v="anime"' +
+      (getStylePackId() === "anime" ? ' class="on"' : "") +
+      ">Anime</button>" +
+      "</div></div>";
     const groqRow =
       '<div class="agent-engine-row agent-groq-key-row">' +
       '<span class="agent-engine-name">Groq (Agent chat)</span>' +
@@ -3211,7 +3754,7 @@
       "Set free Horde key in Generate → Advanced · " +
       '<a href="https://stablehorde.net/register" target="_blank" rel="noopener">Register (still $0)</a>' +
       "</span></div>";
-    el.innerHTML = rows + groqRow + keyRow;
+    el.innerHTML = rows + styleRow + groqRow + keyRow;
     const groqInput = $("#agentGroqKey");
     if (groqInput) {
       const stored = load(KEYS.groqKey, "") || "";
@@ -3242,11 +3785,24 @@
       groqInput.addEventListener("change", persist);
       groqInput.addEventListener("blur", persist);
     }
+    const agentStylePackSeg = $("#agentStylePackSeg");
+    if (agentStylePackSeg && !agentStylePackSeg.dataset.bound) {
+      agentStylePackSeg.dataset.bound = "1";
+      agentStylePackSeg.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        setStylePack(b.dataset.v);
+        toast("Style pack: " + (getStylePack().label || b.dataset.v));
+        // Refresh badge label without full re-render wipe
+        const badge = el.querySelector(".agent-style-pack-row .agent-engine-badge");
+        if (badge) badge.textContent = getStylePack().label || b.dataset.v;
+      });
+    }
   }
 
 
   async function generateAgentImage() {
-    if (state.agentLoading || state.genLoading) return;
+    if (state.agentLoading || state.genLoading || state.storyboardRunning) return;
     const c = current();
     if (!c) {
       toast("Open a character first");
@@ -3872,7 +4428,7 @@
       if (!chip) return;
       $$("#presets .chip").forEach((x) => x.classList.remove("on"));
       chip.classList.add("on");
-      $$("#quickSets .quick-set-card").forEach((x) => x.classList.remove("on"));
+      $$(".preset-tile").forEach((x) => x.classList.remove("on"));
       const [, p] = SCENE_PRESETS[+chip.dataset.p];
       $("#sceneInput").value = p;
       updateFullPreview();
@@ -3880,9 +4436,11 @@
     const quickSetsEl = $("#quickSets");
     if (quickSetsEl) {
       quickSetsEl.addEventListener("click", (e) => {
-        const card = e.target.closest(".quick-set-card");
-        if (!card) return;
-        applyQuickSet(card.dataset.qs);
+        const tile = e.target.closest(".preset-tile, .quick-set-card, [data-pt], [data-qs]");
+        if (!tile) return;
+        const id = tile.dataset.pt || tile.dataset.qs;
+        // One-tap: fill scene + start generate
+        applyPresetTile(id, true);
       });
     }
     const pillsEl = $("#promptPills");
@@ -3936,8 +4494,8 @@
       });
     }
     $("#sceneInput").addEventListener("input", () => {
-      $$("#presets .chip").forEach((x) => x.classList.remove("on"));
-      $$("#quickSets .quick-set-card").forEach((x) => x.classList.remove("on"));
+      $("#presets .chip").forEach((x) => x.classList.remove("on"));
+      $$(".preset-tile").forEach((x) => x.classList.remove("on"));
       updateFullPreview();
     });
     $("#aspectSeg").addEventListener("click", (e) => {
@@ -3950,7 +4508,32 @@
       const b = e.target.closest("button");
       if (!b) return;
       setGenMode(b.dataset.v);
+      renderQuickSets();
     });
+    const stylePackSeg = $("#stylePackSeg");
+    if (stylePackSeg) {
+      setStylePack(load(KEYS.stylePack, "photoreal") || "photoreal");
+      stylePackSeg.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        setStylePack(b.dataset.v);
+        toast("Style pack: " + (getStylePack().label || b.dataset.v));
+      });
+    }
+    const agentStylePackSeg = $("#agentStylePackSeg");
+    if (agentStylePackSeg) {
+      setStylePack(load(KEYS.stylePack, "photoreal") || "photoreal");
+      agentStylePackSeg.addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        setStylePack(b.dataset.v);
+        toast("Style pack: " + (getStylePack().label || b.dataset.v));
+      });
+    }
+    const storyboardBtn = $("#storyboardBtn");
+    if (storyboardBtn) {
+      storyboardBtn.addEventListener("click", () => runStoryboardSet());
+    }
     const providerEl = $("#genProvider");
     if (providerEl) {
       let storedProvider = load(KEYS.genProvider, "horde") || "horde";

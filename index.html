@@ -329,8 +329,14 @@
             <p class="face-lock-preview" id="faceLockPreview"><span class="muted">No short identity yet — rebuild from master in Character Bible or here.</span></p>
             <button type="button" class="btn btn-ghost btn-sm" id="btnRebuildFaceLockGen">Rebuild short lock from master</button>
           </div>
-          <div class="section-label">Quick sets</div>
-          <div class="quick-sets scroll-x" id="quickSets" aria-label="Themed complete sets"></div>
+          <div class="section-label">Style pack</div>
+          <div class="seg style-pack-seg" id="stylePackSeg" role="radiogroup" aria-label="Style pack">
+            <button type="button" class="on" data-v="photoreal">Photoreal</button>
+            <button type="button" data-v="cinema">Cinema</button>
+            <button type="button" data-v="anime">Anime</button>
+          </div>
+          <div class="section-label">Preset tiles</div>
+          <div class="preset-tiles" id="quickSets" aria-label="One-tap scene presets"></div>
           <div class="chips scroll-x" id="presets"></div>
           <textarea id="sceneInput" rows="3" maxlength="800" placeholder="Describe the scene, outfit and mood…"></textarea>
           <div class="prompt-pills" id="promptPills" aria-label="Prompt fragment chips"></div>
@@ -342,9 +348,12 @@
             </div>
             <div class="composer-actions">
               <button type="button" class="btn btn-light" id="generateImageBtn">Generate image</button>
+              <button type="button" class="btn btn-ghost" id="storyboardBtn" title="Expand scene into 4–6 angle variants">Photo set (4–6)</button>
               <button type="button" class="btn btn-ghost" id="copyFullPromptBtn">Copy full prompt</button>
             </div>
           </div>
+          <p class="hint storyboard-hint" id="storyboardProgress" hidden></p>
+          <div class="storyboard-grid" id="storyboardGrid" hidden></div>
           <div class="composer-row composer-row-mode">
             <div class="seg" id="modeSeg" role="radiogroup" aria-label="Content mode">
               <button type="button" class="on" data-v="soft">Soft</button>
@@ -353,7 +362,7 @@
             </div>
             <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
           </div>
-          <p class="gen-api-note">Image gen uses a short identity lock; Copy still uses your full master sheet. Soft / Suggestive / NSFW → AI Horde first (free); Pollinations is Soft/Suggestive fallback. Free only — AI Horde + Pollinations. Optional free Horde key (still $0) speeds queues. Photoreal Horde models preferred; results vary — regenerate if anatomy is broken. Keys stay in this browser only. Adult fictional 21+ only.</p>
+          <p class="gen-api-note">Style packs (Photoreal / Cinema / Anime) + one-tap presets. Image gen uses Face-lock identity; Copy still uses full master. Soft / Suggestive / NSFW → AI Horde first (free); Pollinations Soft/Suggestive fallback. Photo set queues 4–6 angles. Free only — AI Horde + Pollinations. Adult fictional 21+ only.</p>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
