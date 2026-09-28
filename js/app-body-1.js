@@ -1173,6 +1173,37 @@ function setGenProvider(provider) {
   return p;
 }
 
+/* LUMORA_PROVIDER_DELEGATE — capture-phase so Flux taps register even if boot bind misses */
+(function bindLumoraProviderDelegate() {
+  if (typeof document === "undefined") return;
+  if (document.documentElement.dataset.lumoraProv === "1") return;
+  document.documentElement.dataset.lumoraProv = "1";
+  document.addEventListener(
+    "click",
+    function (e) {
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const btn = t.closest("#genProviderSeg button");
+      if (!btn) return;
+      const v = btn.getAttribute("data-provider") || btn.getAttribute("data-v");
+      if (v !== "flux" && v !== "horde" && v !== "pollinations") return;
+      e.preventDefault();
+      if (typeof setGenProvider === "function") setGenProvider(v);
+      if (typeof toast === "function") {
+        toast(
+          v === "flux"
+            ? "Provider: Flux"
+            : v === "pollinations"
+              ? "Provider: Pollinations"
+              : "Provider: AI Horde"
+        );
+      }
+    },
+    true
+  );
+})();
+
+
 function syncUseHordeBtn() {
   const btn = $("#useHordeBtn");
   if (!btn) return;
@@ -1318,9 +1349,10 @@ function setFluxModel(id) {
 }
 
 function syncFluxModelVisibility() {
-  const field = $("#genFluxModelField");
-  if (!field) return;
-  field.hidden = getGenProvider() !== "flux";
+  const field = $("#genFluxModelField") || $("#genFluxModelSeg");
+  if (field) field.hidden = getGenProvider() !== "flux";
+  const hint = $("#genFluxHint");
+  if (hint) hint.hidden = getGenProvider() !== "flux";
 }
 
 /** Snap to sizes NVIDIA Flux Schnell cloud API accepts. */

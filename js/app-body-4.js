@@ -392,21 +392,8 @@ function boot() {
         setGenProvider(providerEl.value);
       });
     }
-    if (providerSeg && !providerSeg.dataset.bound) {
-      providerSeg.dataset.bound = "1";
-      providerSeg.addEventListener("click", (e) => {
-        const b = e.target.closest("button");
-        if (!b || !b.dataset.v) return;
-        setGenProvider(b.dataset.v);
-        toast(
-          b.dataset.v === "flux"
-            ? "Provider: Flux (Schnell/Kontext)"
-            : b.dataset.v === "pollinations"
-              ? "Provider: Pollinations"
-              : "Provider: AI Horde"
-        );
-      });
-    }
+    // Clicks handled by LUMORA_PROVIDER_DELEGATE in app-body-1 (capture).
+    // Only sync initial selection here.
     setGenProvider(initial);
   }
   const fluxSeg = $("#genFluxModelSeg");

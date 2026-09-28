@@ -431,22 +431,16 @@
             <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
           </div>
           <p class="gen-api-note">Tap a provider below. Flux needs your NVIDIA key (Agent → Engines). Both Schnell + Kontext ship; Schnell is default.</p>
-          <div class="field gen-provider-visible">
-            <span class="label">Image provider</span>
-            <div class="seg" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
-              <button type="button" data-v="flux">Flux</button>
-              <button type="button" class="on" data-v="horde">Horde</button>
-              <button type="button" data-v="pollinations">Pollinations</button>
-            </div>
+          <div class="seg gen-provider-seg" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
+            <button type="button" id="btnProviderFlux" data-provider="flux" data-v="flux">Flux</button>
+            <button type="button" id="btnProviderHorde" class="on" data-provider="horde" data-v="horde">Horde</button>
+            <button type="button" id="btnProviderPollinations" data-provider="pollinations" data-v="pollinations">Pollinations</button>
           </div>
-          <div class="field" id="genFluxModelField" hidden>
-            <span class="label">Flux model</span>
-            <div class="seg" id="genFluxModelSeg" role="radiogroup" aria-label="Flux model">
-              <button type="button" class="on" data-v="schnell">Schnell</button>
-              <button type="button" data-v="kontext">Kontext</button>
-            </div>
-            <span class="hint">Schnell = new image. Kontext = edit last image. Same NIM key as Agent.</span>
+          <div class="seg gen-flux-model-seg" id="genFluxModelSeg" hidden role="radiogroup" aria-label="Flux model">
+            <button type="button" data-v="schnell" class="on">Schnell</button>
+            <button type="button" data-v="kontext">Kontext</button>
           </div>
+          <p class="hint" id="genFluxHint" hidden>Schnell = new image · Kontext = edit last image · NVIDIA key in Agent → Engines</p>
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
@@ -772,6 +766,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js"></script>
+<script type="module" src="./js/app.js?v=20260928f"></script>
 </body>
 </html>

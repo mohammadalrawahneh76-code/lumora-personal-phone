@@ -1266,3 +1266,22 @@ dialog.modal-dlg::backdrop { background: rgba(0,0,0,0.7); }
 
 .gen-provider-visible { margin: 8px 0 12px; }
 .gen-provider-visible .seg { flex-wrap: wrap; }
+
+.gen-provider-seg,
+.gen-flux-model-seg {
+  width: 100%;
+  max-width: none !important;
+  flex: 1 1 100% !important;
+  margin: 6px 0 8px;
+}
+.gen-provider-seg button,
+.gen-flux-model-seg button {
+  min-height: 48px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  touch-action: manipulation;
+  cursor: pointer;
+  position: relative;
+  z-index: 6;
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.18);
+}
