@@ -375,7 +375,6 @@ function boot() {
     storyboardBtn.addEventListener("click", () => runStoryboardSet());
   }
   const providerEl = $("#genProvider");
-  const providerSeg = $("#genProviderSeg");
   {
     let storedProvider = load(KEYS.genProvider, "horde") || "horde";
     const initialMode = load(KEYS.genMode, "soft");
