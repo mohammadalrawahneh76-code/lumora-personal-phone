@@ -1208,8 +1208,9 @@ function syncUseHordeBtn() {
   const btn = $("#useHordeBtn");
   if (!btn) return;
   const mode = getGenMode();
-  const onHorde = getGenProvider() === "horde";
-  btn.hidden = !(mode === "nsfw" && !onHorde);
+  const provider = getGenProvider();
+  // Only nudge Horde when NSFW + Pollinations. Never when Flux is selected.
+  btn.hidden = !(mode === "nsfw" && provider === "pollinations");
 }
 
 function syncProviderForMode(mode) {
@@ -2283,9 +2284,16 @@ async function generateSceneImage() {
 }
 
 function syncHordeKeyVisibility() {
+  const provider = getGenProvider();
+  const onFlux = provider === "flux";
   const hordeField = $("#genHordeKeyField");
-  // Always visible under Advanced so Soft users see the free key path
-  if (hordeField) hordeField.hidden = false;
+  // Horde key/model are Horde-only; hide when Flux is active so UI matches selection
+  if (hordeField) hordeField.hidden = onFlux;
+  const modelField = $("#genModel");
+  if (modelField) {
+    const wrap = modelField.closest("label.field") || modelField.parentElement;
+    if (wrap) wrap.hidden = onFlux;
+  }
   syncUseHordeBtn();
   syncFluxModelVisibility();
 }

@@ -428,9 +428,9 @@
               <button type="button" data-v="suggestive">Suggestive</button>
               <button type="button" data-v="nsfw">NSFW</button>
             </div>
-            <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
+            <button type="button" class="btn btn-ghost btn-sm use-horde-btn" id="useHordeBtn" hidden>Switch to AI Horde</button>
           </div>
-          <p class="gen-api-note">Tap a provider below. Flux needs your NVIDIA key (Agent → Engines). Both Schnell + Kontext ship; Schnell is default.</p>
+          <p class="gen-api-note" id="genProviderNote">Flux selected needs NVIDIA key in Agent → Engines. Horde/Pollinations stay free fallbacks.</p>
           <div class="seg gen-provider-seg" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
             <button type="button" id="btnProviderFlux" data-provider="flux" data-v="flux">Flux</button>
             <button type="button" id="btnProviderHorde" class="on" data-provider="horde" data-v="horde">Horde</button>
@@ -766,6 +766,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js?v=20260928f"></script>
+<script type="module" src="./js/app.js?v=20260928g"></script>
 </body>
 </html>
