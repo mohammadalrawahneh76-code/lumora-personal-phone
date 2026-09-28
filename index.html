@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="./style.css" />
+<link rel="stylesheet" href="./style.css?v=20260928j" />
 </head>
 <body>
 <button class="skip" onclick="document.getElementById('main').focus()">Skip to content</button>
@@ -256,7 +256,6 @@
         <button type="button" class="ws-tab" role="tab" data-tab="checklist" data-group="library" aria-controls="panel-checklist" aria-selected="false" hidden>Checklist</button>
         <button type="button" class="ws-tab" role="tab" data-tab="agent" data-group="agent" aria-controls="panel-agent" aria-selected="false" hidden>Chat</button>
         <button type="button" class="ws-tab" role="tab" data-tab="skills" data-group="agent" aria-controls="panel-skills" aria-selected="false" hidden>Skills</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="providers" data-group="agent" aria-controls="panel-providers" aria-selected="false" hidden>Providers</button>
       </nav>
 
       <!-- Bible -->
@@ -413,33 +412,17 @@
                 <button type="button" data-v="suggestive">Suggestive</button>
                 <button type="button" data-v="nsfw">NSFW</button>
               </div>
-              <button type="button" class="btn btn-ghost btn-sm use-horde-btn" id="useHordeBtn" hidden>Switch to AI Horde</button>
             </div>
           </div>
 
           <div class="hub-section" id="genProviderSection">
-            <h3 class="hub-section-title">Provider <em>Main image</em></h3>
-            <p class="gen-api-note" id="genProviderNote">AI Horde (free) — reliable in browser.</p>
-            <div class="provider-card-grid gen-provider-cards" id="genProviderSeg" role="radiogroup" aria-label="Image provider">
-              <button type="button" class="provider-card" id="btnProviderFlux" data-provider="flux" data-v="flux">
-                <span class="provider-card-name">Flux</span>
-                <span class="provider-card-blurb">NIM · needs key + CORS proxy</span>
-              </button>
-              <button type="button" class="provider-card on" id="btnProviderHorde" data-provider="horde" data-v="horde">
-                <span class="provider-card-name">Horde</span>
-                <span class="provider-card-blurb">Free · reliable in browser</span>
-                <span class="provider-main-badge">Main</span>
-              </button>
-              <button type="button" class="provider-card" id="btnProviderPollinations" data-provider="pollinations" data-v="pollinations">
-                <span class="provider-card-name">Pollinations</span>
-                <span class="provider-card-blurb">Free fallback</span>
-              </button>
-            </div>
-            <div class="seg gen-flux-model-seg" id="genFluxModelSeg" hidden role="radiogroup" aria-label="Flux model">
-              <button type="button" data-v="schnell" class="on">Schnell</button>
-              <button type="button" data-v="kontext">Kontext</button>
-            </div>
-            <p class="hint" id="genFluxHint" hidden>Schnell = new image · Kontext = edit last image · needs NVIDIA key + CORS proxy in Agent → Providers (else Horde fallback)</p>
+            <p class="gen-api-note" id="genProviderNote">Image generation uses the app’s default backend.</p>
+            <!-- Hidden select kept so existing JS getGenProvider/setGenProvider keep working until Cloudflare phase -->
+            <select id="genProvider" hidden aria-hidden="true">
+              <option value="flux">NVIDIA Flux</option>
+              <option value="horde" selected>AI Horde</option>
+              <option value="pollinations">Pollinations</option>
+            </select>
           </div>
 
           <div class="hub-section" id="genAspectSection">
@@ -470,18 +453,10 @@
           <details class="gen-advanced">
             <summary>Advanced (optional)</summary>
             <div class="gen-advanced-fields">
-              <label class="field" hidden>
-                <span class="label">Provider</span>
-                <select id="genProvider">
-                  <option value="flux">NVIDIA Flux</option>
-                  <option value="horde" selected>AI Horde</option>
-                  <option value="pollinations">Pollinations</option>
-                </select>
-              </label>
-              <label class="field" id="genHordeKeyField">
-                <span class="label">Free AI Horde API key <em>optional · still $0</em></span>
+              <!-- Provider + Horde key UI removed (keys still read from localStorage if present) -->
+              <label class="field" id="genHordeKeyField" hidden>
+                <span class="label">Free AI Horde API key</span>
                 <input type="text" id="genHordeKey" maxlength="64" placeholder="Leave blank for anonymous" autocomplete="off" />
-                <span class="hint">Free key from <a href="https://stablehorde.net/register" target="_blank" rel="noopener">stablehorde.net/register</a> — faster queues, still $0. Leave blank for anonymous.</span>
               </label>
               <label class="field">
                 <span class="label">Seed <em>blank = random</em></span>
@@ -635,7 +610,7 @@
       <div class="ws-panel" id="panel-agent" role="tabpanel">
         <div class="panel-head">
           <h2 class="h3">Chat</h2>
-          <p class="hint">Studio co-pilot or in-character Lila. Pick chat engines &amp; keys in <strong>Providers</strong>. Free only — data stays in this browser.</p>
+          <p class="hint">Studio co-pilot or in-character Lila. Free text in this browser — Cloudflare Workers AI wiring comes next.</p>
         </div>
         <div class="seg agent-mode-seg" id="agentModeSeg" role="radiogroup" aria-label="Agent mode">
           <button type="button" class="on" data-v="studio">Studio</button>
@@ -694,7 +669,7 @@
               </div>
             </div>
           </details>
-          <p class="hint agent-gen-hint">Edit / animate last still · Providers tab for keys &amp; engines. Free only.</p>
+          <p class="hint agent-gen-hint">Edit / animate last still · image uses the app’s default backend.</p>
         </div>
       </div>
 
@@ -712,74 +687,6 @@
         </div>
       </div>
 
-      <!-- Agent · Providers -->
-      <div class="ws-panel" id="panel-providers" role="tabpanel">
-        <div class="panel-head">
-          <h2 class="h3">Providers</h2>
-          <p class="hint">Pick Main image &amp; chat engines, paste API keys, and review engine status. Keys stay in <code>localStorage</code> only — never committed.</p>
-        </div>
-
-        <div class="hub-section" id="provImageSection">
-          <h3 class="hub-section-title">Main image provider</h3>
-          <p class="hint">Sets Generate default (<code>genProvider</code>). Same pick as Create → Generate.</p>
-          <div class="provider-card-grid" id="provImageCards" role="radiogroup" aria-label="Main image provider">
-            <button type="button" class="provider-card" data-provider="flux" data-v="flux">
-              <span class="provider-card-name">Flux</span>
-              <span class="provider-card-blurb">NVIDIA NIM · Schnell / Kontext</span>
-            </button>
-            <button type="button" class="provider-card on" data-provider="horde" data-v="horde">
-              <span class="provider-card-name">Horde</span>
-              <span class="provider-card-blurb">AI Horde · free &amp; reliable</span>
-              <span class="provider-main-badge">Main</span>
-            </button>
-            <button type="button" class="provider-card" data-provider="pollinations" data-v="pollinations">
-              <span class="provider-card-name">Pollinations</span>
-              <span class="provider-card-blurb">Free public fallback</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="hub-section" id="provChatSection">
-          <h3 class="hub-section-title">Main chat engine</h3>
-          <p class="hint">Agent Send preference. Dolphin uses OpenRouter; Lightning / Kimi / Ultra need NVIDIA + CORS proxy.</p>
-          <div class="provider-card-grid" id="provChatCards" role="radiogroup" aria-label="Main chat engine">
-            <button type="button" class="provider-card" data-chat="lightning" data-v="lightning">
-              <span class="provider-card-name">Lightning</span>
-              <span class="provider-card-blurb">NIM · fast Soft / Suggestive</span>
-            </button>
-            <button type="button" class="provider-card on" data-chat="kimi" data-v="kimi">
-              <span class="provider-card-name">Kimi</span>
-              <span class="provider-card-blurb">NIM · balanced default</span>
-              <span class="provider-main-badge">Main</span>
-            </button>
-            <button type="button" class="provider-card" data-chat="ultra" data-v="ultra">
-              <span class="provider-card-name">Ultra</span>
-              <span class="provider-card-blurb">NIM · deep reasoning</span>
-            </button>
-            <button type="button" class="provider-card" data-chat="lexi" data-v="lexi">
-              <span class="provider-card-name">Dolphin</span>
-              <span class="provider-card-blurb">OpenRouter · uncensored</span>
-            </button>
-          </div>
-          <div class="provider-card-grid provider-card-grid--secondary" id="provChatFallbackCards" aria-label="Chat fallbacks">
-            <div class="provider-card provider-card--info" data-fallback="groq">
-              <span class="provider-card-name">Groq</span>
-              <span class="provider-card-blurb">Free text fallback when NIM unavailable</span>
-            </div>
-            <div class="provider-card provider-card--info" data-fallback="pollinations">
-              <span class="provider-card-name">Pollinations</span>
-              <span class="provider-card-blurb">Last-resort chat fallback</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="hub-section" id="provKeysSection">
-          <h3 class="hub-section-title">Keys, proxy &amp; engines</h3>
-          <div id="agentEnginesDetails" class="agent-engines-box providers-engines-box">
-            <div id="agentEnginesList" class="agent-engines-list"></div>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 </main>
@@ -863,6 +770,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script type="module" src="./js/app.js?v=20260928i"></script>
+<script type="module" src="./js/app.js?v=20260928j"></script>
 </body>
 </html>

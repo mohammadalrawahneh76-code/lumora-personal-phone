@@ -21,9 +21,9 @@ ES modules require HTTP (not `file://`).
 | **Look** | Bible |
 | **Create** | Generate · Scripts · Prompts |
 | **Library** | Media · Calendar · Checklist |
-| **Agent** | Chat · Skills · Providers |
+| **Agent** | Chat · Skills |
 
-**Providers** holds Main image pick (Flux / Horde / Pollinations), Main chat engine (Lightning / Kimi / Ultra / Dolphin), API keys, NVIDIA CORS proxy, and engine status.
+Image generation uses the app’s default backend (no provider picker). Chat uses quiet fallbacks until Cloudflare Workers AI is wired.
 
 ## Project structure
 
@@ -37,13 +37,9 @@ js/
   starters/         # Lila Bloom starter
   data/             # Captions, presets, skills, wizard
 proxy/
-  nvidia-worker.js  # Cloudflare Worker CORS proxy for NVIDIA Flux/NIM
+  nvidia-worker.js  # Cloudflare Worker (legacy NIM CORS; Workers AI comes next)
   README.md         # Deploy notes
 ```
-
-## NVIDIA Flux / NIM
-
-GitHub Pages cannot call NVIDIA directly (CORS). Deploy `proxy/nvidia-worker.js`, then paste the Worker URL into **Agent → Providers → NVIDIA CORS proxy URL**. Keys stay in the browser only — never commit them.
 
 ## Enable GitHub Pages (one-time)
 

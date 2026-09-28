@@ -330,7 +330,7 @@ async function callOpenRouterChat(messages) {
   const key = typeof getOpenRouterKey === "function" ? getOpenRouterKey() : "";
   if (!key) {
     throw new Error(
-      "Add an OpenRouter API key in Agent → Providers for Dolphin (openrouter.ai/keys)."
+      "OpenRouter key not set — trying next chat backend."
     );
   }
   const meta = typeof getNvidiaModelMeta === "function" ? getNvidiaModelMeta() : null;
@@ -381,7 +381,7 @@ async function callOpenRouterChat(messages) {
       (data && (data.message || data.detail || data.title || data.error)) || "";
     const textMsg = typeof msg === "string" ? msg : JSON.stringify(msg);
     if (res.status === 401 || res.status === 403) {
-      throw new Error("Invalid OpenRouter key — check Agent → Providers (Dolphin).");
+      throw new Error("Invalid OpenRouter key — trying next chat backend.");
     }
     if (res.status === 429) {
       throw new Error("OpenRouter rate limit — wait a moment and try again.");
@@ -400,7 +400,7 @@ async function callNvidiaChat(messages) {
   }
   const key = getNvidiaKey();
   if (!key) {
-    throw new Error("Add an NVIDIA NIM key in Agent → Providers (build.nvidia.com).");
+    throw new Error("NVIDIA NIM key not set — trying next chat backend.");
   }
   const modelId = (meta && meta.model) || "moonshotai/kimi-k3";
   const pickId = (meta && meta.id) || "kimi";
@@ -437,7 +437,7 @@ async function callNvidiaChat(messages) {
       friendlyTextApiError(err, "NVIDIA NIM") ||
         (hasProxy
           ? "Could not reach NVIDIA NIM via proxy — Agent will try Groq/Pollinations."
-          : "Could not reach NVIDIA NIM (browser CORS; set CORS proxy in Providers) — Agent will try Groq/Pollinations.")
+          : "Could not reach NVIDIA NIM (CORS) — Agent will try next chat backend.")
     );
   }
   const data = await res.json().catch(() => ({}));
@@ -446,7 +446,7 @@ async function callNvidiaChat(messages) {
       (data && (data.message || data.detail || data.title || data.error)) || "";
     const textMsg = typeof msg === "string" ? msg : JSON.stringify(msg);
     if (res.status === 401 || res.status === 403) {
-      throw new Error("Invalid NVIDIA NIM key — check Agent → Providers.");
+      throw new Error("Invalid NVIDIA NIM key — trying next chat backend.");
     }
     if (res.status === 429) {
       throw new Error("NVIDIA NIM rate limit — wait a moment and try again.");
@@ -474,7 +474,7 @@ async function callGroqChat(messages, model) {
   const key = getGroqKey();
   if (!key) {
     throw new Error(
-      "Add a free Groq key in Agent → Providers (console.groq.com) — or chat uses Pollinations fallback."
+      "Groq key not set — chat will try Pollinations fallback."
     );
   }
   const useModel = model || GROQ_MODELS[0];
@@ -681,7 +681,7 @@ function renderAgentChat() {
       '<div class="agent-empty">' +
       (mode === "lila"
         ? "Say hi — Lila will reply in character (free text)."
-        : "Ask for prompt help, captions, or use Agent engines — Generate image / Generate video.") +
+        : "Ask for prompt help, captions, or Generate image / Generate video.") +
       "</div>";
     return;
   }

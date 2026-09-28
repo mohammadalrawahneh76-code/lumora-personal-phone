@@ -380,8 +380,11 @@ function boot() {
     let storedProvider = load(KEYS.genProvider, "horde") || "horde";
     const initialMode = load(KEYS.genMode, "soft");
     if (storedProvider === "grok") storedProvider = "horde";
+    // No provider picker: Flux only if NIM key already stored; else Horde (or Pollinations Soft/Suggestive if previously stored)
+    const hasNvidia =
+      typeof getNvidiaKey === "function" ? !!getNvidiaKey() : !!(load(KEYS.nvidiaKey, "") || "");
     let initial =
-      storedProvider === "flux"
+      storedProvider === "flux" && hasNvidia
         ? "flux"
         : storedProvider === "pollinations" && initialMode !== "nsfw"
           ? "pollinations"
@@ -392,8 +395,7 @@ function boot() {
         setGenProvider(providerEl.value);
       });
     }
-    // Clicks handled by LUMORA_PROVIDER_DELEGATE in app-body-1 (capture).
-    // Only sync initial selection here.
+    // Provider picker UI removed — silent default (Horde / stored) until Cloudflare.
     setGenProvider(initial);
   }
   const fluxSeg = $("#genFluxModelSeg");

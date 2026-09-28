@@ -360,7 +360,6 @@ const TAB_GROUP = {
   media: "library",
   agent: "agent",
   skills: "agent",
-  providers: "agent",
 };
 const GROUP_DEFAULT_TAB = {
   look: "bible",
@@ -419,10 +418,6 @@ function setTab(tabId, opts = {}) {
     syncAgentModeSeg();
   } else if (tabId === "skills") {
     if (typeof renderAgentSkills === "function") renderAgentSkills();
-  } else if (tabId === "providers") {
-    if (typeof renderAgentEnginesPanel === "function") renderAgentEnginesPanel();
-    if (typeof syncProviderCards === "function") syncProviderCards();
-    if (typeof syncChatEngineCards === "function") syncChatEngineCards();
   }
 }
 
@@ -1162,122 +1157,22 @@ function getGenProvider() {
   return "horde";
 }
 
-function syncProviderCards(provider) {
-  const p =
-    provider ||
-    (typeof getGenProvider === "function" ? getGenProvider() : null) ||
-    "horde";
-  document.querySelectorAll(".provider-card[data-provider]").forEach((b) => {
-    const on = b.getAttribute("data-provider") === p;
-    b.classList.toggle("on", on);
-    const badge = b.querySelector(".provider-main-badge");
-    if (on) {
-      if (!badge) {
-        const span = document.createElement("span");
-        span.className = "provider-main-badge";
-        span.textContent = "Main";
-        b.appendChild(span);
-      }
-    } else if (badge) {
-      badge.remove();
-    }
-  });
-}
-
-function syncChatEngineCards(modelId) {
-  const id =
-    modelId ||
-    (typeof getNvidiaModelId === "function" ? getNvidiaModelId() : null) ||
-    "kimi";
-  document.querySelectorAll(".provider-card[data-chat]").forEach((b) => {
-    const on = b.getAttribute("data-chat") === id || b.getAttribute("data-v") === id;
-    b.classList.toggle("on", on);
-    const badge = b.querySelector(".provider-main-badge");
-    if (on) {
-      if (!badge) {
-        const span = document.createElement("span");
-        span.className = "provider-main-badge";
-        span.textContent = "Main";
-        b.appendChild(span);
-      }
-    } else if (badge) {
-      badge.remove();
-    }
-  });
-}
+/** Provider card UI removed — no-ops keep any lingering callers safe. */
+function syncProviderCards(_provider) {}
+function syncChatEngineCards(_modelId) {}
 
 function setGenProvider(provider) {
   const p =
     provider === "flux" ? "flux" : provider === "horde" ? "horde" : "pollinations";
   const el = $("#genProvider");
   if (el) el.value = p;
-  const seg = $("#genProviderSeg");
-  if (seg) {
-    $$("button", seg).forEach((b) => b.classList.toggle("on", (b.dataset.v || b.getAttribute("data-provider")) === p));
-  }
-  syncProviderCards(p);
   save(KEYS.genProvider, p);
-  syncHordeKeyVisibility();
-  syncUseHordeBtn();
-  syncFluxModelVisibility();
-  updateGenProviderNote(p);
-  if (p === "flux") {
-    const hasKey = typeof getNvidiaKey === "function" && !!getNvidiaKey();
-    const hasProxy = !!getNvidiaProxyBase();
-    if (!hasKey) {
-      toast("Flux selected — paste NVIDIA NIM key + CORS proxy in Agent → Providers");
-    } else if (!hasProxy) {
-      toast("Flux needs CORS proxy in Providers (or falls back to Horde)");
-    }
-  }
+  if (typeof syncHordeKeyVisibility === "function") syncHordeKeyVisibility();
+  if (typeof syncUseHordeBtn === "function") syncUseHordeBtn();
+  if (typeof syncFluxModelVisibility === "function") syncFluxModelVisibility();
+  if (typeof updateGenProviderNote === "function") updateGenProviderNote(p);
   return p;
 }
-
-/* LUMORA_PROVIDER_DELEGATE — capture-phase so Flux taps register even if boot bind misses */
-(function bindLumoraProviderDelegate() {
-  if (typeof document === "undefined") return;
-  if (document.documentElement.dataset.lumoraProv === "1") return;
-  document.documentElement.dataset.lumoraProv = "1";
-  document.addEventListener(
-    "click",
-    function (e) {
-      const t = e.target;
-      if (!t || !t.closest) return;
-      const imgBtn = t.closest("#genProviderSeg button, .provider-card[data-provider], #provImageCards button");
-      if (imgBtn) {
-        const v = imgBtn.getAttribute("data-provider") || imgBtn.getAttribute("data-v");
-        if (v === "flux" || v === "horde" || v === "pollinations") {
-          e.preventDefault();
-          if (typeof setGenProvider === "function") setGenProvider(v);
-          if (typeof toast === "function") {
-            toast(
-              v === "flux"
-                ? "Main image: Flux"
-                : v === "pollinations"
-                  ? "Main image: Pollinations"
-                  : "Main image: AI Horde"
-            );
-          }
-          return;
-        }
-      }
-      const chatBtn = t.closest("#provChatCards button.provider-card[data-chat], #provChatCards button[data-v]");
-      if (chatBtn) {
-        const v = chatBtn.getAttribute("data-chat") || chatBtn.getAttribute("data-v");
-        if (!v) return;
-        e.preventDefault();
-        if (typeof setNvidiaModel === "function") setNvidiaModel(v);
-        if (typeof syncChatEngineCards === "function") syncChatEngineCards(v);
-        if (typeof renderAgentEnginesPanel === "function") renderAgentEnginesPanel();
-        const meta = typeof getNvidiaModelMeta === "function" ? getNvidiaModelMeta() : null;
-        if (typeof toast === "function") {
-          toast("Main chat: " + ((meta && meta.label) || v));
-        }
-      }
-    },
-    true
-  );
-})();
 
 
 function syncUseHordeBtn() {
@@ -1411,7 +1306,7 @@ const NVIDIA_PROXY_HOSTS = new Set([
 ]);
 
 /**
- * fetch() for NVIDIA URLs. When Providers → NVIDIA CORS proxy URL is set,
+ * fetch() for NVIDIA URLs. When a CORS proxy URL is stored in localStorage,
  * rewrites to POST {proxyBase}/nvidia?u=<encoded absolute URL>.
  * Otherwise direct fetch (often blocked by browser CORS on GitHub Pages).
  */
@@ -1429,20 +1324,10 @@ function nvidiaFetch(url, init) {
   return fetch(fetchUrl, init);
 }
 
-function updateGenProviderNote(provider) {
+function updateGenProviderNote(_provider) {
   const note = $("#genProviderNote");
   if (!note) return;
-  const p =
-    provider === "flux" ? "flux" : provider === "pollinations" ? "pollinations" : "horde";
-  if (p === "flux") {
-    note.textContent = getNvidiaProxyBase()
-      ? "Flux via proxy (Schnell/Kontext)."
-      : "Flux needs CORS proxy (Providers) or falls back to Horde.";
-  } else if (p === "horde") {
-    note.textContent = "AI Horde (free) — reliable in browser.";
-  } else {
-    note.textContent = "Pollinations (free Soft/Suggestive). NSFW → prefer Horde.";
-  }
+  note.textContent = "Image generation uses the app’s default backend.";
 }
 
 function getFluxModelId() {
@@ -1537,7 +1422,7 @@ async function generateWithNvidiaFlux(prompt, aspect, mode, opts) {
   const onStatus = typeof opts.onStatus === "function" ? opts.onStatus : null;
   const key = typeof getNvidiaKey === "function" ? getNvidiaKey() : "";
   if (!key) {
-    throw new Error("Add an NVIDIA NIM key in Agent → Providers (build.nvidia.com) for Flux.");
+    throw new Error("NVIDIA Flux key not available — using default image backend.");
   }
   let meta = getFluxModelMeta();
   let imageB64 = opts.image || "";
@@ -1601,7 +1486,7 @@ async function generateWithNvidiaFlux(prompt, aspect, mode, opts) {
       (data && (data.message || data.detail || data.title || data.error)) || "";
     const textMsg = typeof msg === "string" ? msg : JSON.stringify(msg);
     if (res.status === 401 || res.status === 403) {
-      throw new Error("Invalid NVIDIA NIM key — check Agent → Providers.");
+      throw new Error("Invalid NVIDIA NIM key — falling back to default image backend.");
     }
     if (res.status === 429) {
       throw new Error("NVIDIA Flux rate limit — wait a moment and try again.");
@@ -2376,7 +2261,7 @@ async function generateSceneImage() {
 
   let provider = resolveGenProvider(mode, imagePrompt);
   if (getGenProvider() === "flux" && provider !== "flux") {
-    toast("Flux needs an NVIDIA NIM key in Agent → Providers — using Horde…");
+    toast("Using default image backend…");
   }
   if (provider === "horde" && getGenProvider() !== "horde" && getGenProvider() !== "flux") {
     setGenProvider("horde");

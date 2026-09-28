@@ -82,9 +82,9 @@ export const AGENT_ENGINES_SKILLS = [
   {
     id: "agent-engines",
     name: "Agent engines",
-    description: "Agent owns Image Engine + Video stub — ask to generate",
+    description: "Image generate + video stub — ask to generate",
     body:
-      "The Agent owns named engines (not just Studio coaching). Image Engine (ready): free AI Horde first for Soft/Suggestive/NSFW, Pollinations Soft/Suggestive fallback, face-lock — ask “generate an image of…” or tap Generate image. Optional free Horde key (still $0) speeds queues. Video Engine (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent engines over opening the Studio Generate tab. Never invent paid free video or claim Seedance works free.",
+      "The Agent can generate images and attempt video. Image: free AI Horde first for Soft/Suggestive/NSFW, Pollinations Soft/Suggestive fallback, face-lock — ask “generate an image of…” or tap Generate image. Video (free stub): no free Seedance/APOB-quality video yet — ask “try video…” or tap Generate video; Agent replies honestly and can save a video-pending note. Caption/text is the Agent itself. Prefer Agent Generate image over opening Create → Generate when chatting. Never invent paid free video or claim Seedance works free.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -96,7 +96,7 @@ export const STEAL_LIST_AGENT_SKILLS = [
     name: "Style packs",
     description: "Photoreal / Cinema / Anime Horde packs",
     body:
-      "Style packs (OurDream-style): Photoreal (default), Cinema, Anime. Each pack sets Horde model preference list + positive lead tags + negative extras. User picks the pack near Generate / Agent engines; it persists in localStorage. Wire into buildHordePrompt / defaultHordeModels / Agent Image Engine. Free only — Horde + Pollinations. Prefer Photoreal for Lila UGC; Cinema for dramatic stills; Anime for illustration.",
+      "Style packs (OurDream-style): Photoreal (default), Cinema, Anime. Each pack sets Horde model preference list + positive lead tags + negative extras. Style pack persists in localStorage (Photoreal default). Wire into buildHordePrompt / defaultHordeModels / Agent Image Engine. Free only — Horde + Pollinations. Prefer Photoreal for Lila UGC; Cinema for dramatic stills; Anime for illustration.",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -207,7 +207,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Groq Agent chat",
     description: "Free Groq key for Agent text; images stay Horde/Pollinations",
     body:
-      "Agent text chat prefers free Groq (OpenAI-compatible) when the user pastes a key from console.groq.com/keys into Agent → Providers. Key stays in this browser only. If no Groq key, Agent falls back to free Pollinations text. Images NEVER use Groq or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine. Spell it Groq (inference) not Grok (xAI).",
+      "Agent text chat quietly uses free Groq when a key is already in this browser, else free Pollinations text. Do not ask the user to paste API keys in the UI. Images NEVER use Groq or paid xAI Grok — Soft/Suggestive/NSFW images = AI Horde first, Pollinations Soft/Suggestive fallback only. Never suggest paid xAI Grok Imagine. Spell it Groq (inference) not Grok (xAI).",
     enabled: true,
     modes: ["studio", "both"],
   },
@@ -225,7 +225,7 @@ export const GROK_NSFW_AGENT_SKILLS = [
     name: "Free image routing",
     description: "Decision tree: Horde-first Soft/Suggestive/NSFW / Pollinations fallback",
     body:
-      "Routing decision tree (free-only images): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Agent chat text may use free Groq if keyed; that is not an image provider.",
+      "Routing decision tree (free-only images): Soft or Suggestive → AI Horde first (Pollinations fallback). NSFW photoreal → AI Horde (wait 1–3 min). Never suggest paid xAI Grok Imagine. On doll skin, melted hands, multi-face, or blobs → regenerate on Horde. Agent chat text may use free Groq if a key is already stored; that is not an image path.",
     enabled: true,
     modes: ["studio", "both"],
   },
