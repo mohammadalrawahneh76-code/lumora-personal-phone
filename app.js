@@ -2488,7 +2488,7 @@
     const sceneEl = $("#sceneInput");
     if (sceneEl) sceneEl.value = t.scene;
     $$(".preset-tile").forEach((el) => el.classList.toggle("on", el.dataset.pt === id));
-    $$$("#presets .chip").forEach((x) => x.classList.remove("on"));
+    $$("#presets .chip").forEach((x) => x.classList.remove("on"));
     updateFullPreview();
     const genBtn = $("#generateImageBtn");
     if (genBtn) {
@@ -2542,7 +2542,7 @@
       return;
     }
     ta.value = cur ? cur.replace(/[,\s]+$/, "") + ", " + frag : frag;
-    $$$("#presets .chip").forEach((x) => x.classList.remove("on"));
+    $$("#presets .chip").forEach((x) => x.classList.remove("on"));
     $$(".preset-tile").forEach((x) => x.classList.remove("on"));
     const btn = document.querySelector('.prompt-pill[data-pill="' + frag.replace(/"/g, "") + '"]');
     if (btn) btn.classList.add("used");
@@ -5778,7 +5778,7 @@
     $("#presets").addEventListener("click", (e) => {
       const chip = e.target.closest(".chip");
       if (!chip) return;
-      $$$("#presets .chip").forEach((x) => x.classList.remove("on"));
+      $$("#presets .chip").forEach((x) => x.classList.remove("on"));
       chip.classList.add("on");
       $$(".preset-tile").forEach((x) => x.classList.remove("on"));
       const [, p] = SCENE_PRESETS[+chip.dataset.p];
@@ -5846,7 +5846,7 @@
       });
     }
     $("#sceneInput").addEventListener("input", () => {
-      $$$("#presets .chip").forEach((x) => x.classList.remove("on"));
+      $$("#presets .chip").forEach((x) => x.classList.remove("on"));
       $$(".preset-tile").forEach((x) => x.classList.remove("on"));
       updateFullPreview();
     });
