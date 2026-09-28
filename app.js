@@ -2542,7 +2542,7 @@
       return;
     }
     ta.value = cur ? cur.replace(/[,\s]+$/, "") + ", " + frag : frag;
-    $("#presets .chip").forEach((x) => x.classList.remove("on"));
+    $$("#presets .chip").forEach((x) => x.classList.remove("on"));
     $$(".preset-tile").forEach((x) => x.classList.remove("on"));
     const btn = document.querySelector('.prompt-pill[data-pill="' + frag.replace(/"/g, "") + '"]');
     if (btn) btn.classList.add("used");
