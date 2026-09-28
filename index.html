@@ -1,1 +1,605 @@
-PLACEHOLDER_INDEX
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Lumora Personal — Offline AI Influencer Studio</title>
+<meta name="description" content="Personal offline studio for designing AI influencer characters, prompts, captions, and content calendars. Everything stays in your browser." />
+<meta name="theme-color" content="#0b0b0c" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b0c'/%3E%3Ccircle cx='16' cy='16' r='8.5' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='21.5' cy='10.5' r='2.6' fill='white'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+<button class="skip" onclick="document.getElementById('main').focus()">Skip to content</button>
+
+<header class="topbar solid" id="topbar">
+  <button class="brand" data-go="/" aria-label="Lumora home">
+    <svg class="logo" viewBox="0 0 132 28" fill="none" aria-hidden="true">
+      <circle cx="14" cy="14" r="10.5" stroke="currentColor" stroke-width="3.2"/>
+      <circle cx="21.2" cy="6.8" r="3.2" fill="currentColor"/>
+      <text x="33" y="21" fill="currentColor" font-family="Unbounded, sans-serif" font-weight="600" font-size="18" letter-spacing="0.5">lumora</text>
+    </svg>
+  </button>
+  <div class="topbar-right">
+    <span class="personal-note" title="No accounts, no uploads">Personal · local only</span>
+    <button class="btn btn-ghost btn-sm" id="btnExport" title="Export all data as JSON">Export</button>
+    <button class="btn btn-ghost btn-sm" id="btnImport" title="Import JSON backup">Import</button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden />
+    <button class="btn btn-light btn-sm" data-go="/app">Studio</button>
+    <button class="icon-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<nav class="drawer" id="drawer" aria-label="Main">
+  <button data-go="/">Home</button>
+  <button data-go="/app">My characters</button>
+  <button data-go="/create">Create character</button>
+  <button id="drawerExport">Export backup</button>
+  <button id="drawerImport">Import backup</button>
+</nav>
+
+<main id="main" tabindex="-1">
+  <!-- LANDING -->
+  <section class="view" id="view-home">
+    <div class="hero">
+      <div class="hero-img hero-gradient" role="img" aria-label="AI influencer aesthetic"></div>
+      <div class="hero-shade"></div>
+      <div class="hero-content wrap">
+        <h1 class="display">Your private AI influencer studio</h1>
+        <button class="btn btn-light btn-cta" data-go="/app">
+          <span>Open studio</span><small>Personal · offline · nothing uploads</small>
+        </button>
+        <div class="split-line"><span>Character bible</span><i></i><span>Prompt lab</span></div>
+        <ul class="diamonds">
+          <li>Multi-character workspace stored <b>only in this browser</b></li>
+          <li><b>Lila Bloom</b> starter with soft &amp; NSFW prompt library</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="trust wrap">
+      <h2 class="h2 center">Design looks, scenes, captions, and a weekly plan — no camera, no account</h2>
+    </div>
+
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <figure class="mq-s1"><div class="mq-ph" aria-hidden="true"></div><figcaption>Fitness</figcaption></figure>
+        <figure class="mq-s2"><div class="mq-ph" aria-hidden="true"></div><figcaption>Street style</figcaption></figure>
+        <figure class="mq-s3"><div class="mq-ph" aria-hidden="true"></div><figcaption>Travel</figcaption></figure>
+        <figure class="mq-s4"><div class="mq-ph" aria-hidden="true"></div><figcaption>Lifestyle</figcaption></figure>
+        <figure class="mq-s5"><div class="mq-ph" aria-hidden="true"></div><figcaption>Fashion</figcaption></figure>
+        <figure class="mq-s6"><div class="mq-ph" aria-hidden="true"></div><figcaption>Wellness</figcaption></figure>
+        <figure class="mq-s1"><div class="mq-ph" aria-hidden="true"></div><figcaption>Fitness</figcaption></figure>
+        <figure class="mq-s2"><div class="mq-ph" aria-hidden="true"></div><figcaption>Street style</figcaption></figure>
+        <figure class="mq-s3"><div class="mq-ph" aria-hidden="true"></div><figcaption>Travel</figcaption></figure>
+        <figure class="mq-s4"><div class="mq-ph" aria-hidden="true"></div><figcaption>Lifestyle</figcaption></figure>
+        <figure class="mq-s5"><div class="mq-ph" aria-hidden="true"></div><figcaption>Fashion</figcaption></figure>
+        <figure class="mq-s6"><div class="mq-ph" aria-hidden="true"></div><figcaption>Wellness</figcaption></figure>
+      </div>
+    </div>
+
+    <section class="wrap section" id="how">
+      <p class="eyebrow">How it works</p>
+      <h2 class="h2">Three steps, all local</h2>
+      <ol class="steps">
+        <li><span class="num">01</span><h3>Design the character</h3><p>Pick niche, look chips, and a master appearance string. Or start with Lila Bloom.</p></li>
+        <li><span class="num">02</span><h3>Build prompts &amp; captions</h3><p>Scene library with soft / suggestive / NSFW moods. Generate a preview via a free public image API, or copy master + scene into any other tool.</p></li>
+        <li><span class="num">03</span><h3>Plan &amp; track</h3><p>Calendar ideas, daily checklist, and a media library for in-app generations plus notes from elsewhere.</p></li>
+      </ol>
+      <div class="personal-banner">
+        <strong>Personal use only.</strong> No sign-in, no billing, no credits, no backend. Export a JSON backup anytime — clearing browser data for this file’s origin erases local studio data.
+      </div>
+      <div style="margin-top:28px;display:flex;flex-wrap:wrap;gap:10px">
+        <button class="btn btn-light" data-go="/create">Create character</button>
+        <button class="btn btn-ghost" data-go="/app">Open studio</button>
+      </div>
+    </section>
+
+    <footer class="footer wrap">
+      <span>© 2026 Lumora Personal</span>
+      <span>Fictional 21+ characters. Local-only. Label AI content where required.</span>
+    </footer>
+  </section>
+
+  <!-- CREATE -->
+  <section class="view app-view" id="view-create" hidden>
+    <div class="wrap narrow">
+      <p class="eyebrow">New character</p>
+      <h1 class="h1">Design your influencer</h1>
+      <p class="muted">Pick what you like. A master appearance string is built from your choices — edit it anytime in the bible.</p>
+
+      <form id="createForm" class="form" autocomplete="off">
+        <label class="field">
+          <span class="label">Name</span>
+          <input name="name" required maxlength="40" placeholder="e.g. Layla Noor" />
+        </label>
+
+        <div class="field"><span class="label">Gender</span>
+          <div class="chips" data-name="gender" data-single>
+            <button type="button" class="chip on" data-v="Woman">Woman</button>
+            <button type="button" class="chip" data-v="Man">Man</button>
+            <button type="button" class="chip" data-v="Non-binary person">Non-binary</button>
+          </div>
+        </div>
+
+        <div class="field"><span class="label">Age <output id="ageOut">22</output> <em>21+</em></span>
+          <input type="range" name="age" min="21" max="60" value="22" id="ageRange" />
+        </div>
+
+        <div class="field"><span class="label">Ethnicity</span>
+          <div class="chips" data-name="ethnicity" data-single>
+            <button type="button" class="chip on" data-v="Any">Any</button>
+            <button type="button" class="chip" data-v="Middle Eastern">Middle Eastern</button>
+            <button type="button" class="chip" data-v="Latina/Latino">Latin</button>
+            <button type="button" class="chip" data-v="East Asian">East Asian</button>
+            <button type="button" class="chip" data-v="South Asian">South Asian</button>
+            <button type="button" class="chip" data-v="Black">Black</button>
+            <button type="button" class="chip" data-v="White European">European</button>
+            <button type="button" class="chip" data-v="Mixed-race">Mixed</button>
+          </div>
+        </div>
+
+        <div class="field"><span class="label">Hair</span>
+          <div class="chips" data-name="hair" data-single>
+            <button type="button" class="chip" data-v="Long dark wavy">Long dark wavy</button>
+            <button type="button" class="chip" data-v="Sleek blonde">Sleek blonde</button>
+            <button type="button" class="chip" data-v="Curly auburn">Curly auburn</button>
+            <button type="button" class="chip" data-v="Short black bob">Short bob</button>
+            <button type="button" class="chip" data-v="Braided">Braids</button>
+            <button type="button" class="chip" data-v="Short textured fade">Short fade</button>
+            <button type="button" class="chip" data-v="Shoulder-length brown">Brown, mid</button>
+            <button type="button" class="chip" data-v="Long soft rose-pink wavy">Rose-pink soft</button>
+          </div>
+        </div>
+
+        <div class="field"><span class="label">Eyes</span>
+          <div class="chips" data-name="eyes" data-single>
+            <button type="button" class="chip" data-v="Brown">Brown</button>
+            <button type="button" class="chip" data-v="Hazel">Hazel</button>
+            <button type="button" class="chip" data-v="Green">Green</button>
+            <button type="button" class="chip" data-v="Blue">Blue</button>
+            <button type="button" class="chip" data-v="Honey-brown">Honey-brown</button>
+          </div>
+        </div>
+
+        <div class="field"><span class="label">Body</span>
+          <div class="chips" data-name="body" data-single>
+            <button type="button" class="chip" data-v="Slim">Slim</button>
+            <button type="button" class="chip" data-v="Athletic">Athletic</button>
+            <button type="button" class="chip" data-v="Curvy">Curvy</button>
+            <button type="button" class="chip" data-v="Petite soft hourglass">Petite soft</button>
+            <button type="button" class="chip" data-v="Muscular">Muscular</button>
+          </div>
+        </div>
+
+        <div class="field"><span class="label">Style</span>
+          <div class="chips" data-name="style" data-single>
+            <button type="button" class="chip" data-v="Minimal clean">Minimal</button>
+            <button type="button" class="chip" data-v="Sporty chic">Sporty</button>
+            <button type="button" class="chip" data-v="Streetwear">Streetwear</button>
+            <button type="button" class="chip" data-v="High fashion">High fashion</button>
+            <button type="button" class="chip" data-v="Soft cute pastel">Soft cute</button>
+            <button type="button" class="chip" data-v="Bohemian">Boho</button>
+            <button type="button" class="chip" data-v="Business smart">Business</button>
+          </div>
+        </div>
+
+        <div class="field"><span class="label">Niche</span>
+          <div class="chips" data-name="niche" data-single>
+            <button type="button" class="chip on" data-v="Lifestyle">Lifestyle</button>
+            <button type="button" class="chip" data-v="Fitness">Fitness</button>
+            <button type="button" class="chip" data-v="Fashion">Fashion</button>
+            <button type="button" class="chip" data-v="Beauty">Beauty</button>
+            <button type="button" class="chip" data-v="Travel">Travel</button>
+            <button type="button" class="chip" data-v="Food">Food</button>
+            <button type="button" class="chip" data-v="Soft aesthetic / NSFW">Soft aesthetic</button>
+            <button type="button" class="chip" data-v="Tech">Tech</button>
+          </div>
+        </div>
+
+        <label class="field">
+          <span class="label">Extra details <em>optional</em></span>
+          <textarea name="details" rows="3" maxlength="300" placeholder="Freckles, small nose ring, warm smile, thick eyebrows..."></textarea>
+        </label>
+
+        <label class="field">
+          <span class="label">Personality <em>optional</em></span>
+          <textarea name="personality" rows="2" maxlength="500" placeholder="Soft-spoken, playful, warm…"></textarea>
+        </label>
+
+        <div class="sticky-cta">
+          <button type="submit" class="btn btn-light btn-block" id="createBtn">Save character</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="view app-view" id="view-app" hidden>
+    <div class="wrap">
+      <div class="row-between">
+        <div>
+          <p class="eyebrow">Studio</p>
+          <h1 class="h1">My characters</h1>
+        </div>
+        <button class="btn btn-light btn-sm" data-go="/create">+ New</button>
+      </div>
+      <div id="charGrid" class="char-grid"></div>
+    </div>
+  </section>
+
+  <!-- INFLUENCER WORKSPACE -->
+  <section class="view app-view" id="view-inf" hidden>
+    <div class="wrap">
+      <button class="back" data-go="/app">← My characters</button>
+      <div class="inf-head" id="infHead"></div>
+
+      <nav class="ws-tabs" id="wsTabs" role="tablist" aria-label="Workspace">
+        <button type="button" class="ws-tab on" role="tab" data-tab="bible">Look / Bible</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="prompts">Prompts</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="generate">Generate scene</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="captions">Captions</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="calendar">Calendar</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="checklist">Checklist</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="media">Media library</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="agent">Agent</button>
+      </nav>
+
+      <!-- Bible -->
+      <div class="ws-panel on" id="panel-bible" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Character Bible</h2>
+          <p class="hint">Consistency source of truth. Copy the master block into every generation.</p>
+        </div>
+        <div class="card grid-2">
+          <label class="field"><span class="label">Name</span><input type="text" id="char-name" maxlength="40" /></label>
+          <label class="field"><span class="label">Age (21+)</span><input type="number" id="char-age" min="21" max="99" /></label>
+          <label class="field"><span class="label">Niche</span><input type="text" id="char-niche" maxlength="40" /></label>
+          <label class="field"><span class="label">Look attrs</span><input type="text" id="char-attrs-summary" readonly /></label>
+          <label class="field full"><span class="label">Personality</span><textarea id="char-personality" rows="3"></textarea></label>
+          <label class="field full"><span class="label">Backstory</span><textarea id="char-backstory" rows="3"></textarea></label>
+          <label class="field full"><span class="label">Speaking style</span><textarea id="char-speaking" rows="2"></textarea></label>
+          <label class="field full"><span class="label">MASTER appearance description</span><textarea id="char-master" rows="10" class="mono"></textarea></label>
+          <div class="face-lock-card full" id="bibleFaceLock">
+            <div class="face-lock-head">
+              <label class="toggle-row">
+                <input type="checkbox" id="char-face-lock-enabled" />
+                <span>Face-lock (scene-only prompts)</span>
+              </label>
+            </div>
+            <p class="hint face-lock-help">Like APOB: lock the face once; only describe outfit/pose/scene when generating.</p>
+            <label class="field"><span class="label">Short identity lock</span>
+              <textarea id="char-face-lock-identity" rows="2" maxlength="280" placeholder="One short sentence: hair / eyes / face / body / age…"></textarea>
+            </label>
+            <label class="field"><span class="label">Face-lock notes <em>optional</em></span>
+              <input type="text" id="char-face-lock-notes" maxlength="200" placeholder="e.g. approved hero look, do not change face" />
+            </label>
+            <div class="toolbar" style="margin-top:8px">
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-rebuild-face-lock">Rebuild short lock from master</button>
+            </div>
+          </div>
+        </div>
+        <div class="toolbar sticky-actions">
+          <button type="button" class="btn btn-light" id="btn-save-character">Save bible</button>
+          <button type="button" class="btn btn-ghost" id="btn-copy-master">Copy master</button>
+          <button type="button" class="btn btn-ghost" id="btn-rebuild-master">Rebuild from attrs</button>
+        </div>
+      </div>
+
+      <!-- Prompts -->
+      <div class="ws-panel" id="panel-prompts" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Prompt Lab</h2>
+          <p class="hint">Scene library. Copy prepends your master appearance automatically.</p>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-light btn-sm" id="btn-add-prompt">+ Add prompt</button>
+          <label class="filter-chip">
+            <span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Filter</span>
+            <select id="prompt-filter">
+              <option value="all">All moods</option>
+              <option value="soft">Soft / SFW-leaning</option>
+              <option value="suggestive">Suggestive</option>
+              <option value="nsfw">NSFW</option>
+            </select>
+          </label>
+        </div>
+        <div id="prompt-list" class="card-list"></div>
+      </div>
+
+      <!-- Generate scene -->
+      <div class="ws-panel" id="panel-generate" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Generate scene</h2>
+          <p class="hint">Build a full prompt (master + scene), generate a preview with a free public image API, or copy into any other tool. Save results to your media library.</p>
+        </div>
+        <div class="composer" id="composer">
+          <div class="face-lock-gen" id="faceLockGen">
+            <label class="toggle-row">
+              <input type="checkbox" id="genFaceLockToggle" />
+              <span>Face-lock (scene-only prompts)</span>
+            </label>
+            <p class="hint face-lock-help">Like APOB: lock the face once; only describe outfit/pose/scene.</p>
+            <p class="face-lock-preview" id="faceLockPreview"><span class="muted">No short identity yet — rebuild from master in Character Bible or here.</span></p>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnRebuildFaceLockGen">Rebuild short lock from master</button>
+          </div>
+          <div class="section-label">Quick sets</div>
+          <div class="quick-sets scroll-x" id="quickSets" aria-label="Themed complete sets"></div>
+          <div class="chips scroll-x" id="presets"></div>
+          <textarea id="sceneInput" rows="3" maxlength="800" placeholder="Describe the scene, outfit and mood…"></textarea>
+          <div class="prompt-pills" id="promptPills" aria-label="Prompt fragment chips"></div>
+          <div class="composer-row">
+            <div class="seg" id="aspectSeg" role="radiogroup" aria-label="Format">
+              <button type="button" class="on" data-v="3:4">Portrait</button>
+              <button type="button" data-v="1:1">Square</button>
+              <button type="button" data-v="9:16">Story</button>
+            </div>
+            <div class="composer-actions">
+              <button type="button" class="btn btn-light" id="generateImageBtn">Generate image</button>
+              <button type="button" class="btn btn-ghost" id="copyFullPromptBtn">Copy full prompt</button>
+            </div>
+          </div>
+          <div class="composer-row composer-row-mode">
+            <div class="seg" id="modeSeg" role="radiogroup" aria-label="Content mode">
+              <button type="button" class="on" data-v="soft">Soft</button>
+              <button type="button" data-v="suggestive">Suggestive</button>
+              <button type="button" data-v="nsfw">NSFW</button>
+            </div>
+            <button type="button" class="btn btn-light btn-sm use-horde-btn" id="useHordeBtn" hidden>Use AI Horde</button>
+          </div>
+          <p class="gen-api-note">Image gen uses a short identity lock; Copy still uses your full master sheet. Pollinations and AI Horde are free. Grok Imagine requires a paid xAI API key/credits — skip it if you don't want to pay. Soft / Suggestive → Pollinations (free); NSFW → AI Horde (free). AI Horde free NSFW now targets stronger photoreal models; results vary; regenerate if anatomy is broken. Keys stay in this browser only. Adult fictional 21+ only.</p>
+          <details class="gen-advanced">
+            <summary>Advanced (optional)</summary>
+            <div class="gen-advanced-fields">
+              <label class="field">
+                <span class="label">Provider</span>
+                <select id="genProvider">
+                  <option value="grok">Grok Imagine (xAI · paid credits)</option>
+                  <option value="pollinations">Pollinations (free)</option>
+                  <option value="horde">AI Horde (better NSFW)</option>
+                </select>
+              </label>
+              <label class="field" id="genXaiKeyField" hidden>
+                <span class="label">xAI API key <em>from console.x.ai — stored only in this browser</em></span>
+                <input type="password" id="genXaiKey" maxlength="200" placeholder="Paste xAI API key" autocomplete="off" />
+                <span class="hint gen-grok-paid-hint" id="genGrokPaidHint">Paid — needs credits at console.x.ai. Use Pollinations or AI Horde for free.</span>
+              </label>
+              <label class="field" id="genHordeKeyField" hidden>
+                <span class="label">AI Horde API key <em>optional · anonymous 0000000000 has rate limits</em></span>
+                <input type="text" id="genHordeKey" maxlength="64" placeholder="0000000000 or paste key from stablehorde.net" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span class="label">Seed <em>blank = random</em></span>
+                <input type="text" id="genSeed" inputmode="numeric" maxlength="16" placeholder="e.g. 42" />
+              </label>
+              <label class="field">
+                <span class="label">Model <em>Pollinations / Horde, or grok-* for Grok</em></span>
+                <input type="text" id="genModel" maxlength="40" placeholder="e.g. flux or grok-imagine-image-2.0" />
+              </label>
+            </div>
+          </details>
+          <div class="prompt-preview" id="fullPromptPreview" hidden></div>
+          <div class="gen-preview" id="genPreview" hidden>
+            <div class="gen-preview-frame" id="genPreviewFrame">
+              <div class="gen-preview-skeleton" id="genPreviewSkeleton" hidden>Generating…</div>
+              <img id="genPreviewImg" alt="Generated scene" hidden />
+            </div>
+          </div>
+          <div class="media-note-form">
+            <label class="field">
+              <span class="label">Save as generation note <em>optional</em></span>
+              <input type="text" id="genNoteLabel" maxlength="120" placeholder="Label, e.g. Golden hour window" />
+            </label>
+            <label class="field">
+              <span class="label">Notes / seed / what worked</span>
+              <textarea id="genNoteBody" rows="2" maxlength="500" placeholder="Paste notes or a path to a local file…"></textarea>
+            </label>
+            <label class="field">
+              <span class="label">Attach local image preview <em>optional · stays in this browser</em></span>
+              <input type="file" id="genImageFile" accept="image/*" />
+            </label>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-save-gen">Save to media library</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Captions -->
+      <div class="ws-panel" id="panel-captions" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Captions</h2>
+          <p class="hint">Soft, cute, a little shy &amp; flirty — drafts in their voice. No API.</p>
+        </div>
+        <div class="card">
+          <div class="grid-2">
+            <label class="field">
+              <span class="label">Mood</span>
+              <select id="caption-mood">
+                <option value="shy">Shy &amp; soft</option>
+                <option value="flirty">Flirty tease</option>
+                <option value="cozy">Cozy morning</option>
+                <option value="naughty">Naughty whisper</option>
+                <option value="grateful">Grateful / sweet</option>
+                <option value="playful">Playful</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="label">Optional topic</span>
+              <input type="text" id="caption-topic" placeholder="e.g. silk robe, rainy night…" />
+            </label>
+          </div>
+          <div class="toolbar">
+            <button type="button" class="btn btn-light btn-sm" id="btn-gen-caption">Draft caption</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-copy-caption">Copy</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-save-fav">♥ Save favorite</button>
+          </div>
+          <label class="field">
+            <span class="label">Draft</span>
+            <textarea id="caption-draft" rows="4" placeholder="Your caption will appear here…"></textarea>
+          </label>
+        </div>
+        <div class="panel-head sub"><h3>Favorites</h3></div>
+        <div id="caption-favs" class="card-list"></div>
+        <div class="panel-head sub"><h3>Voice templates (reference)</h3></div>
+        <ul id="caption-templates" class="template-list card"></ul>
+      </div>
+
+      <!-- Calendar -->
+      <div class="ws-panel" id="panel-calendar" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Content Calendar</h2>
+          <p class="hint">Ideas for the week — day, idea, status.</p>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-light btn-sm" id="btn-add-idea">+ Add idea</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-reset-week">Reset to starter week</button>
+        </div>
+        <div id="calendar-list" class="card-list"></div>
+      </div>
+
+      <!-- Checklist -->
+      <div class="ws-panel" id="panel-checklist" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Daily Checklist</h2>
+          <p class="hint">Persists for today. Auto-resets when the calendar day changes.</p>
+        </div>
+        <div class="card">
+          <p class="date-line">Today · <strong id="checklist-date"></strong></p>
+          <ul id="checklist-items" class="checklist"></ul>
+          <div class="toolbar">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-reset-checklist">Reset today’s list</button>
+            <span class="progress" id="checklist-progress"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Media -->
+      <div class="ws-panel" id="panel-media" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Media library</h2>
+          <p class="hint">In-app generations (image URL), local uploads, and notes. Remote previews load from the free API URL; local uploads stay in this browser.</p>
+        </div>
+        <div class="toolbar">
+          <button type="button" class="btn btn-light btn-sm" id="btn-add-media-note">+ Add note</button>
+        </div>
+        <div class="media-grid" id="mediaGrid"></div>
+      </div>
+
+      <!-- Agent -->
+      <div class="ws-panel" id="panel-agent" role="tabpanel">
+        <div class="panel-head">
+          <h2 class="h3">Agent</h2>
+          <p class="hint">Studio co-pilot or in-character Lila chat. Teach skills below. Free only — data stays in this browser.</p>
+        </div>
+        <div class="seg agent-mode-seg" id="agentModeSeg" role="radiogroup" aria-label="Agent mode">
+          <button type="button" class="on" data-v="studio">Studio</button>
+          <button type="button" data-v="lila">Lila</button>
+        </div>
+        <div class="agent-chat" id="agentChat" aria-live="polite"></div>
+        <div class="agent-composer">
+          <textarea id="agentInput" rows="2" maxlength="2000" placeholder="Ask the agent…" enterkeyhint="send"></textarea>
+          <div class="composer-row">
+            <button type="button" class="btn btn-light" id="agentSendBtn">Send</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="agentClearBtn">Clear chat</button>
+          </div>
+        </div>
+        <details class="agent-skills-box" id="agentSkillsDetails">
+          <summary>Skills</summary>
+          <div class="toolbar" style="margin-top:10px">
+            <button type="button" class="btn btn-light btn-sm" id="btn-add-skill">+ Add skill</button>
+          </div>
+          <div id="agentSkillsList" class="card-list"></div>
+        </details>
+        <p class="gen-api-note">Free Pollinations text brain; skills teach the agent; data stays in this browser. No paid APIs or credits.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Prompt dialog -->
+<dialog id="prompt-dialog" class="modal-dlg">
+  <form method="dialog" id="prompt-form" class="modal-body">
+    <h3 id="prompt-dialog-title">Edit prompt</h3>
+    <label class="field"><span class="label">Title</span><input type="text" id="prompt-title" required /></label>
+    <label class="field"><span class="label">Mood</span>
+      <select id="prompt-mood">
+        <option value="soft">Soft / SFW-leaning</option>
+        <option value="suggestive">Suggestive</option>
+        <option value="nsfw">NSFW</option>
+      </select>
+    </label>
+    <label class="field"><span class="label">Scene prompt</span><textarea id="prompt-scene" rows="5" required></textarea></label>
+    <label class="field"><span class="label">Notes</span><textarea id="prompt-notes" rows="2" placeholder="What worked, seeds, model tips…"></textarea></label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-light" value="save">Save</button>
+      <button type="button" class="btn btn-ghost" id="prompt-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Media note dialog -->
+<dialog id="media-dialog" class="modal-dlg">
+  <form method="dialog" id="media-form" class="modal-body">
+    <h3>Add media note</h3>
+    <label class="field"><span class="label">Label</span><input type="text" id="media-label" required maxlength="120" /></label>
+    <label class="field"><span class="label">Notes</span><textarea id="media-notes" rows="3" maxlength="500"></textarea></label>
+    <label class="field"><span class="label">Aspect</span>
+      <select id="media-aspect">
+        <option value="3:4">Portrait 3:4</option>
+        <option value="1:1">Square 1:1</option>
+        <option value="9:16">Story 9:16</option>
+      </select>
+    </label>
+    <label class="field"><span class="label">Local image <em>optional</em></span><input type="file" id="media-file" accept="image/*" /></label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-light" value="save">Save</button>
+      <button type="button" class="btn btn-ghost" id="media-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+
+<!-- Skill dialog -->
+<dialog id="skill-dialog" class="modal-dlg">
+  <form method="dialog" id="skill-form" class="modal-body">
+    <h3 id="skill-dialog-title">Edit skill</h3>
+    <label class="field"><span class="label">Name</span><input type="text" id="skill-name" required maxlength="80" /></label>
+    <label class="field"><span class="label">Short description</span><input type="text" id="skill-desc" maxlength="160" placeholder="What this skill teaches" /></label>
+    <label class="field"><span class="label">Body</span><textarea id="skill-body" rows="6" required placeholder="Instructions the agent should follow…"></textarea></label>
+    <label class="field"><span class="label">Mode</span>
+      <select id="skill-modes">
+        <option value="both">Both (Studio + Lila)</option>
+        <option value="studio">Studio only</option>
+        <option value="lila">Lila only</option>
+      </select>
+    </label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-light" value="save">Save</button>
+      <button type="button" class="btn btn-ghost" id="skill-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Viewer -->
+<div class="modal" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Media viewer">
+  <div class="modal-card">
+    <button class="icon-close" id="viewerClose" aria-label="Close">×</button>
+    <div class="viewer-media" id="viewerMedia"></div>
+    <div class="viewer-body">
+      <p class="viewer-label" id="viewerLabel"></p>
+      <div class="caption" id="viewerNotes" hidden></div>
+      <div class="viewer-actions" id="viewerActions"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="./app.js"></script>
+</body>
+</html>
