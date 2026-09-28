@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0b0b0c" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b0c'/%3E%3Ccircle cx='16' cy='16' r='8.5' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='21.5' cy='10.5' r='2.6' fill='white'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="./style.css" />
@@ -240,15 +240,21 @@
       <button class="back" data-go="/app">← My characters</button>
       <div class="inf-head" id="infHead"></div>
 
-      <nav class="ws-tabs" id="wsTabs" role="tablist" aria-label="Workspace">
-        <button type="button" class="ws-tab on" role="tab" data-tab="bible">Look / Bible</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="prompts">Prompts</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="generate">Generate scene</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="captions">Captions</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="calendar">Calendar</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="checklist">Checklist</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="media">Media library</button>
-        <button type="button" class="ws-tab" role="tab" data-tab="agent">Agent</button>
+      <nav class="ws-groups" id="wsGroups" role="tablist" aria-label="Workspace sections">
+        <button type="button" class="ws-group on" role="tab" data-group="look" aria-selected="true">Look</button>
+        <button type="button" class="ws-group" role="tab" data-group="create" aria-selected="false">Create</button>
+        <button type="button" class="ws-group" role="tab" data-group="plan" aria-selected="false">Plan</button>
+        <button type="button" class="ws-group" role="tab" data-group="agent" aria-selected="false">Agent</button>
+      </nav>
+      <nav class="ws-tabs" id="wsTabs" role="tablist" aria-label="Workspace tools">
+        <button type="button" class="ws-tab on" role="tab" data-tab="bible" data-group="look" aria-controls="panel-bible" aria-selected="true">Bible</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="prompts" data-group="create" aria-controls="panel-prompts" aria-selected="false" hidden>Prompts</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="generate" data-group="create" aria-controls="panel-generate" aria-selected="false" hidden>Generate</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="captions" data-group="create" aria-controls="panel-captions" aria-selected="false" hidden>Captions</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="calendar" data-group="plan" aria-controls="panel-calendar" aria-selected="false" hidden>Calendar</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="checklist" data-group="plan" aria-controls="panel-checklist" aria-selected="false" hidden>Checklist</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="media" data-group="plan" aria-controls="panel-media" aria-selected="false" hidden>Media</button>
+        <button type="button" class="ws-tab" role="tab" data-tab="agent" data-group="agent" aria-controls="panel-agent" aria-selected="false" hidden>Chat &amp; engines</button>
       </nav>
 
       <!-- Bible -->
@@ -749,6 +755,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="./app.js"></script>
+<script type="module" src="./js/app.js"></script>
 </body>
 </html>
